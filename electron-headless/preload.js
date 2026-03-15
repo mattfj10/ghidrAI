@@ -27,8 +27,17 @@ const fallbackApi = {
   listProjects: () => jsonRequest("/api/v1/projects"),
   createProject: (projectPath, projectName) =>
     jsonRequest("/api/v1/projects", "POST", { projectPath, projectName }),
-  chooseProjectDirectory: async () => {
-    throw new Error("Native directory picker is not available.");
+  openProject: (projectPath, projectName) =>
+    jsonRequest("/api/v1/projects/open", "POST", { projectPath, projectName }),
+  clearProjects: () => jsonRequest("/api/v1/projects", "DELETE"),
+  chooseCreateProjectDirectory: async () => {
+    throw new Error("Native create-project picker is not available.");
+  },
+  chooseExistingProject: async () => {
+    throw new Error("Native open-project picker is not available.");
+  },
+  promptForProjectName: async () => {
+    throw new Error("Native prompt is not available.");
   }
 };
 
@@ -36,11 +45,24 @@ try {
   const { contextBridge, ipcRenderer } = require("electron");
   const api = {
     ...fallbackApi,
-    chooseProjectDirectory: () => {
+    clearProjects: () => fallbackApi.clearProjects(),
+    chooseCreateProjectDirectory: () => {
       if (!ipcRenderer) {
         throw new Error("Electron IPC bridge is unavailable.");
       }
-      return ipcRenderer.invoke("headless:choose-project-directory");
+      return ipcRenderer.invoke("headless:choose-create-project-directory");
+    },
+    chooseExistingProject: () => {
+      if (!ipcRenderer) {
+        throw new Error("Electron IPC bridge is unavailable.");
+      }
+      return ipcRenderer.invoke("headless:choose-existing-project");
+    },
+    promptForProjectName: () => {
+      if (!ipcRenderer) {
+        throw new Error("Electron IPC bridge is unavailable.");
+      }
+      return ipcRenderer.invoke("headless:prompt-for-project-name");
     }
   };
 

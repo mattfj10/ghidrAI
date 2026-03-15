@@ -46,13 +46,17 @@ class ProjectStore {
 		return projects;
 	}
 
+	void ensureGhidraInitialized() throws IOException {
+		projectOps.ensureGhidraInitialized();
+	}
+
 	synchronized ProjectRecord getProject(String projectId) {
 		ProjectRecord project = projectsById.get(projectId);
 		if (project == null) {
 			throw new ApiException(404, "PROJECT_NOT_FOUND",
 				"The requested project could not be found.", Map.of("projectId", projectId));
 		}
-		project.existsOnDisk = Files.isDirectory(Paths.get(project.projectPath));
+		project.existsOnDisk = projectExists(project);
 		return project;
 	}
 
@@ -60,8 +64,10 @@ class ProjectStore {
 			throws IOException {
 		projectOps.createProject(projectDirectory, projectName);
 		ProjectRecord record = ProjectRecord.create(nextProjectId(), projectName,
-			Paths.get(projectDirectory, projectName + ".rep").toAbsolutePath().toString(), true, false);
+			logicalProjectPath(projectDirectory, projectName), true, false);
 		projectsById.put(record.projectId, record);
+		// Verify the project actually exists on disk after creation using the original parameters
+		record.existsOnDisk = projectOps.projectExists(projectDirectory, projectName);
 		save();
 		eventBroker.publish("project.created", Map.of("projectId", record.projectId, "timestamp",
 			Instant.now().toString(), "project", record));
@@ -75,9 +81,12 @@ class ProjectStore {
 
 	synchronized ProjectRecord openProjectByPathAndName(String projectDirectory, String projectName)
 			throws IOException {
-		String fullPath = Paths.get(projectDirectory, projectName + ".rep").toAbsolutePath().toString();
-		ProjectRecord record =
-			projectsById.values().stream().filter(p -> p.projectPath.equals(fullPath)).findFirst().orElse(null);
+		String fullPath = logicalProjectPath(projectDirectory, projectName);
+		ProjectRecord record = projectsById.values()
+				.stream()
+				.filter(p -> normalizeStoredProjectPath(p.projectPath).equals(fullPath))
+				.findFirst()
+				.orElse(null);
 		if (record == null) {
 			if (!projectOps.projectExists(projectDirectory, projectName)) {
 				throw new ApiException(404, "PROJECT_NOT_FOUND",
@@ -86,20 +95,20 @@ class ProjectStore {
 			}
 			record = ProjectRecord.create(nextProjectId(), projectName, fullPath, true, false);
 			projectsById.put(record.projectId, record);
+			// Project existence was already verified above, use the original parameters to confirm
+			record.existsOnDisk = projectOps.projectExists(projectDirectory, projectName);
 		}
 		return activateRecord(record);
 	}
 
 	private ProjectRecord activateRecord(ProjectRecord record) throws IOException {
-		Path fullPath = Paths.get(record.projectPath);
-		projectOps.validateProjectOpen(Optional.ofNullable(fullPath.getParent()).orElse(fullPath).toString(),
-			fullPath.getFileName().toString());
+		projectOps.validateProjectOpen(projectDirectory(record), projectName(record));
 		for (ProjectRecord candidate : projectsById.values()) {
 			candidate.isActive = false;
 		}
 		record.isActive = true;
 		record.lastOpenedAt = Instant.now().toString();
-		record.existsOnDisk = Files.isDirectory(Paths.get(record.projectPath));
+		record.existsOnDisk = projectExists(record);
 		save();
 		eventBroker.publish("project.opened", Map.of("projectId", record.projectId, "timestamp",
 			record.lastOpenedAt, "project", record));
@@ -108,8 +117,40 @@ class ProjectStore {
 
 	private void refreshExistsFlags() {
 		for (ProjectRecord record : projectsById.values()) {
-			record.existsOnDisk = Files.isDirectory(Paths.get(record.projectPath));
+			record.existsOnDisk = projectExists(record);
 		}
+	}
+
+	private boolean projectExists(ProjectRecord record) {
+		return projectOps.projectExists(projectDirectory(record), projectName(record));
+	}
+
+	private String projectDirectory(ProjectRecord record) {
+		Path projectPath = Paths.get(normalizeStoredProjectPath(record.projectPath));
+		Path parent = projectPath.getParent();
+		return (parent == null ? projectPath : parent).toString();
+	}
+
+	private String projectName(ProjectRecord record) {
+		String filename = Paths.get(normalizeStoredProjectPath(record.projectPath)).getFileName().toString();
+		if (filename.endsWith(".rep")) {
+			return filename.substring(0, filename.length() - ".rep".length());
+		}
+		if (filename.endsWith(".gpr")) {
+			return filename.substring(0, filename.length() - ".gpr".length());
+		}
+		return filename;
+	}
+
+	private String logicalProjectPath(String projectDirectory, String projectName) {
+		return Paths.get(projectDirectory, projectName).toAbsolutePath().toString();
+	}
+
+	private String normalizeStoredProjectPath(String projectPath) {
+		if (projectPath.endsWith(".rep") || projectPath.endsWith(".gpr")) {
+			return projectPath.substring(0, projectPath.length() - 4);
+		}
+		return projectPath;
 	}
 
 	private String nextProjectId() {
@@ -128,13 +169,20 @@ class ProjectStore {
 			return;
 		}
 		for (ProjectRecord record : records) {
+			record.projectPath = normalizeStoredProjectPath(record.projectPath);
 			projectsById.put(record.projectId, record);
 		}
 	}
 
+	synchronized void clearAllProjects() throws IOException {
+		projectsById.clear();
+		save();
+	}
+
 	private void save() throws IOException {
-		Files.writeString(storeFile,
-			JsonSupport.GSON.toJson(new ArrayList<>(projectsById.values())), StandardCharsets.UTF_8,
+		List<ProjectRecord> records = new ArrayList<>(projectsById.values());
+		String json = JsonSupport.GSON.toJson(records);
+		Files.writeString(storeFile, json, StandardCharsets.UTF_8,
 			StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
 	}
 }

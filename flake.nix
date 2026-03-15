@@ -199,7 +199,8 @@
               backend_pid="$!"
 
               ready=0
-              for _ in $(seq 1 240); do
+              echo "Waiting for Ghidra to initialize (this may take 60-90 seconds on first run)..."
+              for _ in $(seq 1 480); do
                 if curl -fsS "$GHIDRA_BACKEND_URL/api/v1/health" >/dev/null; then
                   ready=1
                   break

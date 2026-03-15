@@ -11,7 +11,7 @@
     <header class="topbar">
       <div>
         <p class="eyebrow">Headless Backend</p>
-        <h1>New Project</h1>
+        <h1>Project Home</h1>
       </div>
       <div id="health" class="status-pill"></div>
     </header>
@@ -23,31 +23,15 @@
           <span class="chip">Minimal Slice</span>
         </div>
         <p class="panel-copy">
-          Choose a parent directory, enter a project name, and create a local Ghidra
-          project. Created projects are remembered and shown when you reopen the app.
+          Create a new local Ghidra project or browse to an existing one. The file
+          browser will ask where to create or open the project when you click the
+          action buttons below. For existing projects, you can select a `.gpr` file,
+          a `.rep` directory, or a folder that contains exactly one Ghidra project.
         </p>
-        <label class="field">
-          <span>Projects Directory</span>
-          <div class="inline-field">
-            <input
-              id="createProjectPath"
-              placeholder="/home/user/ghidra-projects"
-              autocomplete="off"
-            />
-            <button id="browseProjectPathBtn" type="button" class="ghost">Browse</button>
-          </div>
-        </label>
-        <label class="field">
-          <span>Project Name</span>
-          <input
-            id="createProjectName"
-            placeholder="MyProject"
-            autocomplete="off"
-          />
-        </label>
         <p id="formMessage" class="form-message" aria-live="polite"></p>
         <div class="actions">
-          <button id="createProjectBtn" type="button">Create Project</button>
+          <button id="createProjectBtn" type="button">Create New Project</button>
+          <button id="openProjectBtn" type="button" class="ghost">Open Project</button>
         </div>
       </section>
 
@@ -56,6 +40,7 @@
           <h2>Remembered Project Locations</h2>
           <div class="actions">
             <button id="refreshProjectsBtn" class="ghost">Refresh</button>
+            <button id="clearProjectsBtn" class="ghost">Clear</button>
           </div>
         </div>
         <div id="projectsList" class="project-list"></div>
