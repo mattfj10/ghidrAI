@@ -60,7 +60,7 @@ class ProjectStore {
 			throws IOException {
 		projectOps.createProject(projectDirectory, projectName);
 		ProjectRecord record = ProjectRecord.create(nextProjectId(), projectName,
-			Paths.get(projectDirectory, projectName).toAbsolutePath().toString(), true, false);
+			Paths.get(projectDirectory, projectName + ".rep").toAbsolutePath().toString(), true, false);
 		projectsById.put(record.projectId, record);
 		save();
 		eventBroker.publish("project.created", Map.of("projectId", record.projectId, "timestamp",
@@ -75,7 +75,7 @@ class ProjectStore {
 
 	synchronized ProjectRecord openProjectByPathAndName(String projectDirectory, String projectName)
 			throws IOException {
-		String fullPath = Paths.get(projectDirectory, projectName).toAbsolutePath().toString();
+		String fullPath = Paths.get(projectDirectory, projectName + ".rep").toAbsolutePath().toString();
 		ProjectRecord record =
 			projectsById.values().stream().filter(p -> p.projectPath.equals(fullPath)).findFirst().orElse(null);
 		if (record == null) {
