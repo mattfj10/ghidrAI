@@ -30,6 +30,9 @@ const fallbackApi = {
   openProject: (projectPath, projectName) =>
     jsonRequest("/api/v1/projects/open", "POST", { projectPath, projectName }),
   clearProjects: () => jsonRequest("/api/v1/projects", "DELETE"),
+  launchDesktopProject: async () => {
+    throw new Error("Native desktop launch is not available.");
+  },
   chooseCreateProjectDirectory: async () => {
     throw new Error("Native create-project picker is not available.");
   },
@@ -57,6 +60,12 @@ try {
         throw new Error("Electron IPC bridge is unavailable.");
       }
       return ipcRenderer.invoke("headless:choose-existing-project");
+    },
+    launchDesktopProject: (project) => {
+      if (!ipcRenderer) {
+        throw new Error("Electron IPC bridge is unavailable.");
+      }
+      return ipcRenderer.invoke("headless:launch-desktop-project", project);
     },
     promptForProjectName: () => {
       if (!ipcRenderer) {

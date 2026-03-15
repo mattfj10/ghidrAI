@@ -6,6 +6,7 @@ const openProjectBtnEl = document.getElementById("openProjectBtn");
 const refreshProjectsBtnEl = document.getElementById("refreshProjectsBtn");
 const clearProjectsBtnEl = document.getElementById("clearProjectsBtn");
 const api = window.headlessApi;
+let busyState = false;
 
 function requireApi() {
   if (!api) {
@@ -25,11 +26,15 @@ function setFormMessage(message, tone = "muted") {
   formMessageEl.dataset.tone = tone;
 }
 
-function setBusy(isBusy) {
-  createProjectBtnEl.disabled = isBusy;
-  openProjectBtnEl.disabled = isBusy;
-  refreshProjectsBtnEl.disabled = isBusy;
-  clearProjectsBtnEl.disabled = isBusy;
+function setBusy(nextBusyState) {
+  busyState = Boolean(nextBusyState);
+  createProjectBtnEl.disabled = busyState;
+  openProjectBtnEl.disabled = busyState;
+  refreshProjectsBtnEl.disabled = busyState;
+  clearProjectsBtnEl.disabled = busyState;
+  for (const card of document.querySelectorAll(".project-card-action")) {
+    card.disabled = busyState;
+  }
 }
 
 async function refreshHealth() {
@@ -47,6 +52,51 @@ function formatProjectLocation(project) {
   return pathParts.join("/") || project.projectPath;
 }
 
+async function launchRememberedProject(project) {
+  if (!project.existsOnDisk) {
+    setFormMessage(`Cannot open ${project.name}: project is missing on disk.`, "error");
+    return;
+  }
+
+  setBusy(true);
+  setFormMessage(`Launching ${project.name} in Ghidra...`, "muted");
+  try {
+    await requireApi().launchDesktopProject(project);
+    setFormMessage(`Launched ${project.name} in Ghidra.`, "success");
+  } finally {
+    setBusy(false);
+  }
+}
+
+function createProjectCard(project) {
+  const card = document.createElement("button");
+  card.type = "button";
+  card.className = "project-card project-card-action";
+  if (!project.existsOnDisk) {
+    card.classList.add("is-missing");
+  }
+  card.disabled = busyState;
+  card.innerHTML = `
+    <div class="project-title">${project.name}</div>
+    <div class="project-meta"><strong>Directory:</strong> ${formatProjectLocation(project)}</div>
+    <div class="project-meta"><strong>Project Path:</strong> ${project.projectPath}</div>
+    <div class="project-meta">
+      <strong>Status:</strong> ${project.existsOnDisk ? "available" : "missing on disk"}
+    </div>
+    <div class="project-hint">
+      ${project.existsOnDisk ? "Open this project in desktop Ghidra" : "This remembered project is no longer available on disk"}
+    </div>
+  `;
+  card.addEventListener("click", async () => {
+    try {
+      await launchRememberedProject(project);
+    } catch (error) {
+      setFormMessage(error.message, "error");
+    }
+  });
+  return card;
+}
+
 function renderProjects(projects) {
   projectsListEl.innerHTML = "";
   if (!projects.length) {
@@ -62,17 +112,7 @@ function renderProjects(projects) {
   }
 
   for (const project of projects) {
-    const card = document.createElement("div");
-    card.className = "project-card";
-    card.innerHTML = `
-      <div class="project-title">${project.name}</div>
-      <div class="project-meta"><strong>Directory:</strong> ${formatProjectLocation(project)}</div>
-      <div class="project-meta"><strong>Project Path:</strong> ${project.projectPath}</div>
-      <div class="project-meta">
-        <strong>Status:</strong> ${project.existsOnDisk ? "available" : "missing on disk"}
-      </div>
-    `;
-    projectsListEl.appendChild(card);
+    projectsListEl.appendChild(createProjectCard(project));
   }
 }
 

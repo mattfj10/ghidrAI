@@ -216,6 +216,37 @@ button.danger {
   background: rgba(7, 10, 20, 0.45);
 }
 
+.project-card-action {
+  width: 100%;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 120ms ease, transform 120ms ease,
+    background 120ms ease, box-shadow 120ms ease;
+}
+
+.project-card-action:hover:not(:disabled),
+.project-card-action:focus-visible {
+  border-color: rgba(95, 133, 255, 0.45);
+  background: rgba(14, 18, 34, 0.82);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+  transform: translateY(-1px);
+}
+
+.project-card-action:focus-visible {
+  outline: none;
+}
+
+.project-card-action.is-missing {
+  border-color: rgba(191, 74, 106, 0.28);
+}
+
+.project-card-action.is-missing:hover:not(:disabled),
+.project-card-action.is-missing:focus-visible {
+  border-color: rgba(191, 74, 106, 0.42);
+}
+
 .project-card.empty-state {
   min-height: 140px;
   display: flex;
@@ -236,6 +267,11 @@ button.danger {
 
 .project-meta strong {
   color: var(--text);
+}
+
+.project-hint {
+  color: #c9d7ff;
+  font-size: 12px;
 }
 
 .form-message {

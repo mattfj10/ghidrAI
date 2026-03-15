@@ -1,5 +1,6 @@
 const fs = require("node:fs");
 const path = require("node:path");
+const { spawn } = require("node:child_process");
 
 async function loadElectronMain() {
   try {
@@ -22,6 +23,8 @@ async function main() {
   if (!app || !BrowserWindow || !dialog || !ipcMain) {
     throw new Error("Electron main-process APIs are unavailable.");
   }
+
+  const repoRoot = path.resolve(__dirname, "..");
 
   function createWindow() {
     const window = new BrowserWindow({
@@ -79,6 +82,52 @@ async function main() {
     );
   }
 
+  function getDesktopLauncherPath() {
+    if (process.platform === "linux") {
+      return path.join(repoRoot, "Ghidra", "RuntimeScripts", "Linux", "ghidraRun");
+    }
+    if (process.platform === "win32") {
+      return path.join(repoRoot, "Ghidra", "RuntimeScripts", "Windows", "ghidraRun.bat");
+    }
+    throw new Error(`Desktop Ghidra launch is not supported on ${process.platform}.`);
+  }
+
+  function toProjectFilePath(project) {
+    if (!project || typeof project.projectPath !== "string" || !project.projectPath.trim()) {
+      throw new Error("Missing remembered project path.");
+    }
+    const normalizedProjectPath = project.projectPath.endsWith(".gpr")
+      ? project.projectPath
+      : `${project.projectPath}.gpr`;
+    return path.resolve(normalizedProjectPath);
+  }
+
+  function launchDesktopProject(project) {
+    const projectFilePath = toProjectFilePath(project);
+    if (!fs.existsSync(projectFilePath)) {
+      throw new Error(`Project file not found: ${projectFilePath}`);
+    }
+
+    const launcherPath = getDesktopLauncherPath();
+    if (!fs.existsSync(launcherPath)) {
+      throw new Error(`Could not find Ghidra launcher: ${launcherPath}`);
+    }
+
+    return new Promise((resolve, reject) => {
+      const child = spawn(launcherPath, [projectFilePath], {
+        cwd: repoRoot,
+        detached: true,
+        stdio: "ignore",
+        shell: process.platform === "win32"
+      });
+      child.once("error", reject);
+      child.once("spawn", () => {
+        child.unref();
+        resolve({ launched: true, projectFilePath });
+      });
+    });
+  }
+
   await app.whenReady();
   ipcMain.handle("headless:choose-create-project-directory", async () => {
     const result = await dialog.showOpenDialog({
@@ -100,6 +149,9 @@ async function main() {
       return null;
     }
     return normalizeProjectSelection(result.filePaths[0]);
+  });
+  ipcMain.handle("headless:launch-desktop-project", async (_event, project) => {
+    return launchDesktopProject(project);
   });
   
   ipcMain.handle("headless:prompt-for-project-name", async () => {
@@ -186,6 +238,7 @@ async function main() {
   app.on("will-quit", () => {
     ipcMain.removeHandler("headless:choose-create-project-directory");
     ipcMain.removeHandler("headless:choose-existing-project");
+    ipcMain.removeHandler("headless:launch-desktop-project");
     ipcMain.removeHandler("headless:prompt-for-project-name");
   });
 }
