@@ -92,6 +92,7 @@ class ScriptSpec {
 
 class ImportAnalyzeRequest {
 	String inputPath;
+	List<String> inputPaths = new ArrayList<>();
 	Boolean recursive;
 	Boolean readOnly;
 	Boolean noAnalysis;

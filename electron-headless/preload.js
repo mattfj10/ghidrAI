@@ -27,6 +27,8 @@ const fallbackApi = {
   listProjects: () => jsonRequest("/api/v1/projects"),
   createProject: (projectPath, projectName) =>
     jsonRequest("/api/v1/projects", "POST", { projectPath, projectName }),
+  importAndAnalyze: (projectId, inputPaths) =>
+    jsonRequest(`/api/v1/projects/${projectId}/import-and-analyze`, "POST", { inputPaths }),
   openProject: (projectPath, projectName) =>
     jsonRequest("/api/v1/projects/open", "POST", { projectPath, projectName }),
   clearProjects: () => jsonRequest("/api/v1/projects", "DELETE"),
@@ -39,8 +41,14 @@ const fallbackApi = {
   chooseExistingProject: async () => {
     throw new Error("Native open-project picker is not available.");
   },
+  chooseBinaryFiles: async () => {
+    throw new Error("Native binary file picker is not available.");
+  },
   promptForProjectName: async () => {
     throw new Error("Native prompt is not available.");
+  },
+  showAddBinariesModal: async () => {
+    throw new Error("Native add-binaries modal is not available.");
   }
 };
 
@@ -61,6 +69,12 @@ try {
       }
       return ipcRenderer.invoke("headless:choose-existing-project");
     },
+    chooseBinaryFiles: () => {
+      if (!ipcRenderer) {
+        throw new Error("Electron IPC bridge is unavailable.");
+      }
+      return ipcRenderer.invoke("headless:choose-binary-files");
+    },
     launchDesktopProject: (project) => {
       if (!ipcRenderer) {
         throw new Error("Electron IPC bridge is unavailable.");
@@ -72,6 +86,12 @@ try {
         throw new Error("Electron IPC bridge is unavailable.");
       }
       return ipcRenderer.invoke("headless:prompt-for-project-name");
+    },
+    showAddBinariesModal: () => {
+      if (!ipcRenderer) {
+        throw new Error("Electron IPC bridge is unavailable.");
+      }
+      return ipcRenderer.invoke("headless:show-add-binaries-modal");
     }
   };
 

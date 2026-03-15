@@ -142,6 +142,8 @@ public class ElectronHeadlessServer {
 					projectStore.openProjectByPathAndName(request.projectPath, request.projectName);
 				ImportAnalyzeRequest importRequest = new ImportAnalyzeRequest();
 				importRequest.inputPath = request.inputPath;
+				importRequest.inputPaths =
+					request.inputPaths != null ? new ArrayList<>(request.inputPaths) : null;
 				importRequest.recursive = request.recursive;
 				importRequest.readOnly = request.readOnly;
 				importRequest.noAnalysis = request.noAnalysis;

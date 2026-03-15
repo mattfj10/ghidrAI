@@ -150,10 +150,142 @@ async function main() {
     }
     return normalizeProjectSelection(result.filePaths[0]);
   });
+  ipcMain.handle("headless:choose-binary-files", async () => {
+    const result = await dialog.showOpenDialog({
+      title: "Add Binaries to Project",
+      properties: ["openFile", "multiSelections"]
+    });
+    if (result.canceled || !result.filePaths.length) {
+      return null;
+    }
+    return result.filePaths;
+  });
   ipcMain.handle("headless:launch-desktop-project", async (_event, project) => {
     return launchDesktopProject(project);
   });
   
+  ipcMain.handle("headless:show-add-binaries-modal", () => {
+    return new Promise((resolve) => {
+      const addBinariesWindow = new BrowserWindow({
+        width: 520,
+        height: 420,
+        parent: BrowserWindow.getFocusedWindow(),
+        modal: true,
+        show: false,
+        resizable: true,
+        webPreferences: {
+          nodeIntegration: true,
+          contextIsolation: false
+        }
+      });
+
+      const addBinariesHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: "Segoe UI", sans-serif; background: #252526; color: #ccc; padding: 20px; margin: 0; }
+            h3 { margin-top: 0; margin-bottom: 12px; font-size: 14px; font-weight: 500; color: #fff; }
+            .binary-list { max-height: 200px; overflow-y: auto; border: 1px solid #454545; border-radius: 4px; background: #1e1e1e; margin-bottom: 12px; padding: 8px; }
+            .binary-item { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 4px; margin-bottom: 4px; background: #2d2d2d; font-size: 12px; }
+            .binary-item:last-child { margin-bottom: 0; }
+            .binary-name { font-weight: 500; color: #fff; flex-shrink: 0; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            .binary-path { color: #9e9e9e; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+            .binary-remove { flex-shrink: 0; padding: 2px 8px; font-size: 11px; cursor: pointer; background: #454545; border: none; color: #ccc; border-radius: 2px; }
+            .binary-remove:hover { background: #bf4a6a; color: #fff; }
+            .empty-msg { color: #6e6e6e; font-size: 12px; padding: 12px; text-align: center; }
+            .buttons { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+            button { padding: 6px 16px; border: none; border-radius: 2px; cursor: pointer; font-size: 13px; }
+            button.add { background: #0e639c; color: white; }
+            button.add:hover { background: #1177bb; }
+            button.create { background: #007fd4; color: white; }
+            button.create:hover { background: #1a8ae6; }
+            button.cancel { background: transparent; border: 1px solid #454545; color: #ccc; }
+            button.cancel:hover { background: #454545; }
+          </style>
+        </head>
+        <body>
+          <h3>Add Binaries to Project</h3>
+          <p style="margin: 0 0 12px; font-size: 12px; color: #9e9e9e;">Optional: add files to import into the project. Leave empty to create an empty project.</p>
+          <div class="binary-list" id="list">
+            <div class="empty-msg" id="emptyMsg">No binaries added yet</div>
+          </div>
+          <div class="buttons">
+            <button class="cancel" id="cancel">Cancel</button>
+            <button class="add" id="add">Add Files</button>
+            <button class="create" id="create">Create Project</button>
+          </div>
+          <script>
+            const { ipcRenderer } = require('electron');
+            const listEl = document.getElementById('list');
+            const emptyMsg = document.getElementById('emptyMsg');
+            let binaries = [];
+
+            function render() {
+              const items = listEl.querySelectorAll('.binary-item');
+              items.forEach(i => i.remove());
+              if (binaries.length === 0) {
+                emptyMsg.style.display = 'block';
+                return;
+              }
+              emptyMsg.style.display = 'none';
+              binaries.forEach((b, idx) => {
+                const div = document.createElement('div');
+                div.className = 'binary-item';
+                div.innerHTML = '<span class="binary-name" title="' + (b.path || '').replace(/"/g, '&quot;') + '">' + (b.name || b.path) + '</span><span class="binary-path" title="' + (b.path || '').replace(/"/g, '&quot;') + '">' + (b.path || '') + '</span><button class="binary-remove" data-idx="' + idx + '">Remove</button>';
+                div.querySelector('.binary-remove').onclick = () => { binaries.splice(idx, 1); render(); };
+                listEl.appendChild(div);
+              });
+            }
+
+            document.getElementById('add').onclick = async () => {
+              const paths = await ipcRenderer.invoke('headless:choose-binary-files');
+              if (paths && paths.length) {
+                paths.forEach(p => {
+                  if (binaries.some(b => b.path === p)) return;
+                  const name = p.split(/[\\\\/]/).pop() || p;
+                  binaries.push({ name, path: p });
+                });
+                render();
+              }
+            };
+
+            document.getElementById('create').onclick = () => {
+              ipcRenderer.send('add-binaries-result', binaries.map(b => b.path));
+            };
+
+            document.getElementById('cancel').onclick = () => {
+              ipcRenderer.send('add-binaries-result', null);
+            };
+
+            document.addEventListener('keydown', (e) => {
+              if (e.key === 'Escape') ipcRenderer.send('add-binaries-result', null);
+            });
+
+            render();
+          </script>
+        </body>
+        </html>
+      `;
+
+      addBinariesWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(addBinariesHtml));
+
+      addBinariesWindow.once('ready-to-show', () => {
+        addBinariesWindow.show();
+      });
+
+      ipcMain.once('add-binaries-result', (_event, value) => {
+        addBinariesWindow.close();
+        resolve(value);
+      });
+
+      addBinariesWindow.on('closed', () => {
+        try { ipcMain.removeAllListeners('add-binaries-result'); } catch (_) {}
+        resolve(null);
+      });
+    });
+  });
+
   ipcMain.handle("headless:prompt-for-project-name", async () => {
     // We use a simple prompt window since Electron doesn't have a built-in text prompt dialog
     return new Promise((resolve) => {
@@ -238,8 +370,10 @@ async function main() {
   app.on("will-quit", () => {
     ipcMain.removeHandler("headless:choose-create-project-directory");
     ipcMain.removeHandler("headless:choose-existing-project");
+    ipcMain.removeHandler("headless:choose-binary-files");
     ipcMain.removeHandler("headless:launch-desktop-project");
     ipcMain.removeHandler("headless:prompt-for-project-name");
+    ipcMain.removeHandler("headless:show-add-binaries-modal");
   });
 }
 

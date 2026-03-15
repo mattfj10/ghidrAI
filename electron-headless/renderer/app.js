@@ -134,6 +134,12 @@ async function createProject() {
     return;
   }
 
+  const binaryPaths = await requireApi().showAddBinariesModal();
+  if (binaryPaths === null) {
+    setFormMessage("Project creation cancelled.", "muted");
+    return;
+  }
+
   setBusy(true);
   setFormMessage("Creating project...", "muted");
   const slowMessageTimer = setTimeout(() => {
@@ -144,11 +150,21 @@ async function createProject() {
   }, 5000);
   try {
     const response = await requireApi().createProject(projectPath, projectName);
+    const project = response.data.project;
+    if (binaryPaths && binaryPaths.length > 0) {
+      setFormMessage("Importing binaries...", "muted");
+      await requireApi().importAndAnalyze(project.projectId, binaryPaths);
+      setFormMessage(
+        `Created ${project.name} and imported ${binaryPaths.length} binary(s). Analysis may continue in the background.`,
+        "success"
+      );
+    } else {
+      setFormMessage(
+        `Created ${project.name} at ${project.projectPath}.`,
+        "success"
+      );
+    }
     await refreshProjects();
-    setFormMessage(
-      `Created ${response.data.project.name} at ${response.data.project.projectPath}.`,
-      "success"
-    );
   } finally {
     clearTimeout(slowMessageTimer);
     setBusy(false);
