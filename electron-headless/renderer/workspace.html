@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ghidra Workspace</title>
+    <link rel="stylesheet" href="./workspace.css" />
+  </head>
+  <body>
+    <div class="app-container">
+      <!-- Top Navigation -->
+      <header class="top-nav">
+        <div class="menu-bar">
+          <button class="menu-item">File</button>
+          <button class="menu-item">Edit</button>
+          <button class="menu-item">Project</button>
+          <button class="menu-item">Tools</button>
+          <button class="menu-item">Help</button>
+        </div>
+        <div class="global-toolbar">
+          <button class="toolbar-btn" title="Undo" id="btn-undo">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path></svg>
+          </button>
+          <button class="toolbar-btn" title="Redo" id="btn-redo">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"></path><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"></path></svg>
+          </button>
+          <div class="toolbar-separator"></div>
+          <button class="toolbar-btn" title="Cut" id="btn-cut">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"></circle><circle cx="6" cy="18" r="3"></circle><line x1="20" y1="4" x2="8.12" y2="15.88"></line><line x1="14.47" y1="14.48" x2="20" y2="20"></line><line x1="8.12" y1="8.12" x2="12" y2="12"></line></svg>
+          </button>
+          <button class="toolbar-btn" title="Copy" id="btn-copy">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+          </button>
+          <button class="toolbar-btn" title="Paste" id="btn-paste">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
+          </button>
+          <div class="toolbar-separator"></div>
+          <button class="toolbar-btn" title="Link" id="btn-link">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+          </button>
+          <button class="toolbar-btn" title="Refresh" id="btn-refresh">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+          </button>
+        </div>
+      </header>
+
+      <!-- Tool Chest Panel -->
+      <section class="panel tool-chest-panel">
+        <div class="panel-header">Tool Chest</div>
+        <div class="tool-chest-icons">
+          <button class="tool-btn" title="CodeBrowser" id="tool-codebrowser">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#28b887" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path><path d="M2 12l10 5 10-5"></path></svg>
+          </button>
+          <button class="tool-btn" title="Debugger" id="tool-debugger">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5f85ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="6" width="8" height="14" rx="4"></rect><path d="M12 2v4"></path><path d="M12 20v2"></path><path d="M20 10h-4"></path><path d="M8 10H4"></path><path d="M20 14h-4"></path><path d="M8 14H4"></path><path d="M20 18h-4"></path><path d="M8 18H4"></path></svg>
+          </button>
+          <button class="tool-btn" title="Version Tracking" id="tool-vt">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9eabc7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+          </button>
+          <button class="tool-btn" title="Shoe" id="tool-shoe">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5f85ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+          </button>
+        </div>
+      </section>
+
+      <!-- Main Workspace (Active Project) -->
+      <main class="panel main-workspace">
+        <div class="panel-header">Active Project: <span id="active-project-name">test</span></div>
+        
+        <div class="tree-view-container">
+          <ul class="tree-root" id="project-tree">
+            <!-- Tree items injected by JS -->
+          </ul>
+        </div>
+
+        <div class="filter-bar">
+          <label for="tree-filter">Filter:</label>
+          <div class="filter-input-wrapper">
+            <input type="text" id="tree-filter" />
+            <button class="filter-clear-btn" id="btn-clear-filter" title="Clear Filter">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="view-tabs">
+          <button class="tab active" id="tab-tree">Tree View</button>
+          <button class="tab" id="tab-table">Table View</button>
+        </div>
+      </main>
+
+      <!-- Running Tools Panel -->
+      <section class="panel running-tools-panel">
+        <div class="panel-header">Running Tools</div>
+        <div class="running-tools-content">
+          <select class="modern-select" id="running-tools-select">
+            <option value="workspace">Workspace</option>
+          </select>
+        </div>
+      </section>
+
+      <!-- Status Bar -->
+      <footer class="status-bar">
+        <div class="status-message" id="status-message">Ghidra startup complete (3537 ms)</div>
+        <div class="status-indicators">
+          <span class="status-icon" id="status-network" title="Network Status">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
+          </span>
+        </div>
+      </footer>
+    </div>
+
+    <script src="./workspace.js"></script>
+  </body>
+</html>
