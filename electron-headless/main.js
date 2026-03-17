@@ -184,24 +184,24 @@ async function main() {
         <html>
         <head>
           <style>
-            body { font-family: "Segoe UI", sans-serif; background: #252526; color: #ccc; padding: 20px; margin: 0; }
+            body { font-family: "Inter", system-ui, sans-serif; background: #0a0a0a; color: #eeeeee; padding: 20px; margin: 0; }
             h3 { margin-top: 0; margin-bottom: 12px; font-size: 14px; font-weight: 500; color: #fff; }
-            .binary-list { max-height: 200px; overflow-y: auto; border: 1px solid #454545; border-radius: 4px; background: #1e1e1e; margin-bottom: 12px; padding: 8px; }
-            .binary-item { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 4px; margin-bottom: 4px; background: #2d2d2d; font-size: 12px; }
+            .binary-list { max-height: 200px; overflow-y: auto; border: 1px solid #2a2a2a; border-radius: 4px; background: #161616; margin-bottom: 12px; padding: 8px; }
+            .binary-item { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 4px; margin-bottom: 4px; background: #1e1e1e; font-size: 12px; }
             .binary-item:last-child { margin-bottom: 0; }
-            .binary-name { font-weight: 500; color: #fff; flex-shrink: 0; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-            .binary-path { color: #9e9e9e; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
-            .binary-remove { flex-shrink: 0; padding: 2px 8px; font-size: 11px; cursor: pointer; background: #454545; border: none; color: #ccc; border-radius: 2px; }
-            .binary-remove:hover { background: #bf4a6a; color: #fff; }
-            .empty-msg { color: #6e6e6e; font-size: 12px; padding: 12px; text-align: center; }
+            .binary-name { font-weight: 500; color: #eeeeee; flex-shrink: 0; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            .binary-path { color: #888888; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+            .binary-remove { flex-shrink: 0; padding: 4px 8px; font-size: 11px; cursor: pointer; background: transparent; border: 1px solid rgba(191, 74, 106, 0.5); color: #ffb8c9; border-radius: 4px; transition: background 100ms ease; }
+            .binary-remove:hover { background: rgba(191, 74, 106, 0.15); }
+            .empty-msg { color: #888888; font-size: 12px; padding: 12px; text-align: center; }
             .buttons { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
-            button { padding: 6px 16px; border: none; border-radius: 2px; cursor: pointer; font-size: 13px; }
-            button.add { background: #0e639c; color: white; }
-            button.add:hover { background: #1177bb; }
-            button.create { background: #007fd4; color: white; }
-            button.create:hover { background: #1a8ae6; }
-            button.cancel { background: transparent; border: 1px solid #454545; color: #ccc; }
-            button.cancel:hover { background: #454545; }
+            button { padding: 8px 14px; border: 1px solid #2a2a2a; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 500; transition: background 100ms ease, border-color 100ms ease; }
+            button.add { background: #333333; color: #eeeeee; }
+            button.add:hover { background: #444444; border-color: #444; }
+            button.create { background: #333333; color: #eeeeee; }
+            button.create:hover { background: #444444; border-color: #444; }
+            button.cancel { background: transparent; border: 1px solid #2a2a2a; color: #eeeeee; }
+            button.cancel:hover { background: rgba(255, 255, 255, 0.05); }
           </style>
         </head>
         <body>
@@ -307,14 +307,16 @@ async function main() {
         <html>
         <head>
           <style>
-            body { font-family: "Segoe UI", sans-serif; background: #252526; color: #ccc; padding: 20px; margin: 0; }
+            body { font-family: "Inter", system-ui, sans-serif; background: #0a0a0a; color: #eeeeee; padding: 20px; margin: 0; }
             h3 { margin-top: 0; margin-bottom: 15px; font-size: 14px; font-weight: 500; color: #fff; }
-            input { width: 100%; padding: 8px; margin-bottom: 15px; background: #3c3c3c; border: 1px solid #3c3c3c; color: #fff; box-sizing: border-box; outline: none; border-radius: 2px; }
-            input:focus { border-color: #007fd4; }
+            input { width: 100%; padding: 8px 12px; margin-bottom: 15px; background: #161616; border: 1px solid #2a2a2a; color: #eeeeee; box-sizing: border-box; outline: none; border-radius: 4px; font-size: 13px; }
+            input:focus { border-color: #555; }
             .buttons { text-align: right; }
-            button { padding: 6px 16px; margin-left: 8px; border: none; border-radius: 2px; cursor: pointer; }
-            button.ok { background: #007fd4; color: white; }
-            button.cancel { background: transparent; border: 1px solid #454545; color: #ccc; }
+            button { padding: 8px 14px; margin-left: 8px; border: 1px solid #2a2a2a; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 500; transition: background 100ms ease, border-color 100ms ease; }
+            button.ok { background: #333333; color: #eeeeee; }
+            button.ok:hover { background: #444444; border-color: #444; }
+            button.cancel { background: transparent; border: 1px solid #2a2a2a; color: #eeeeee; }
+            button.cancel:hover { background: rgba(255, 255, 255, 0.05); }
           </style>
         </head>
         <body>
@@ -377,14 +379,16 @@ async function main() {
         <html>
         <head>
           <style>
-            body { font-family: "Segoe UI", sans-serif; background: #252526; color: #ccc; padding: 20px; margin: 0; }
+            body { font-family: "Inter", system-ui, sans-serif; background: #0a0a0a; color: #eeeeee; padding: 20px; margin: 0; }
             h3 { margin-top: 0; margin-bottom: 15px; font-size: 14px; font-weight: 500; color: #fff; }
-            input { width: 100%; padding: 8px; margin-bottom: 15px; background: #3c3c3c; border: 1px solid #3c3c3c; color: #fff; box-sizing: border-box; outline: none; border-radius: 2px; }
-            input:focus { border-color: #007fd4; }
+            input { width: 100%; padding: 8px 12px; margin-bottom: 15px; background: #161616; border: 1px solid #2a2a2a; color: #eeeeee; box-sizing: border-box; outline: none; border-radius: 4px; font-size: 13px; }
+            input:focus { border-color: #555; }
             .buttons { text-align: right; }
-            button { padding: 6px 16px; margin-left: 8px; border: none; border-radius: 2px; cursor: pointer; }
-            button.ok { background: #007fd4; color: white; }
-            button.cancel { background: transparent; border: 1px solid #454545; color: #ccc; }
+            button { padding: 8px 14px; margin-left: 8px; border: 1px solid #2a2a2a; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 500; transition: background 100ms ease, border-color 100ms ease; }
+            button.ok { background: #333333; color: #eeeeee; }
+            button.ok:hover { background: #444444; border-color: #444; }
+            button.cancel { background: transparent; border: 1px solid #2a2a2a; color: #eeeeee; }
+            button.cancel:hover { background: rgba(255, 255, 255, 0.05); }
           </style>
         </head>
         <body>

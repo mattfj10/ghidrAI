@@ -11,36 +11,19 @@
     <header class="topbar">
       <div>
         <p class="eyebrow">Headless Backend</p>
-        <h1>Project Home</h1>
+        <h1>Projects</h1>
       </div>
       <div id="health" class="status-pill"></div>
     </header>
 
     <main class="layout">
-      <section class="panel hero-panel">
-        <div class="panel-head">
-          <h2>Create Ghidra Project</h2>
-          <span class="chip">Minimal Slice</span>
-        </div>
-        <p class="panel-copy">
-          Create a new local Ghidra project or browse to an existing one. The file
-          browser will ask where to create or open the project when you click the
-          action buttons below. For existing projects, you can select a `.gpr` file,
-          a `.rep` directory, or a folder that contains exactly one Ghidra project.
-        </p>
+      <div class="action-bar">
+        <button id="createProjectBtn" type="button">New Project</button>
+        <button id="openProjectBtn" type="button" class="ghost">Open Existing</button>
         <p id="formMessage" class="form-message" aria-live="polite"></p>
-        <div class="actions">
-          <button id="createProjectBtn" type="button">Create New Project</button>
-          <button id="openProjectBtn" type="button" class="ghost">Open Project</button>
-        </div>
-      </section>
+      </div>
 
-      <section class="panel">
-        <div class="panel-head">
-          <h2>Remembered Project Locations</h2>
-        </div>
-        <div id="projectsList" class="project-list"></div>
-      </section>
+      <div id="projectsList" class="project-list"></div>
     </main>
 
     <script src="./app.js"></script>

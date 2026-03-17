@@ -153,52 +153,51 @@ async function handleDeleteProject(project) {
   }
 }
 
-function createProjectCard(project) {
-  const card = document.createElement("button");
-  card.type = "button";
-  card.className = "project-card project-card-action";
+function createProjectRow(project) {
+  const row = document.createElement("button");
+  row.type = "button";
+  row.className = "project-row project-card-action";
   if (!project.existsOnDisk) {
-    card.classList.add("is-missing");
+    row.classList.add("is-missing");
   }
-  card.disabled = busyState;
-  card.innerHTML = `
-    <div class="project-title">${project.name}</div>
-    <div class="project-meta"><strong>Directory:</strong> ${formatProjectLocation(project)}</div>
-    <div class="project-meta"><strong>Project Path:</strong> ${project.projectPath}</div>
-    <div class="project-meta">
-      <strong>Status:</strong> ${project.existsOnDisk ? "available" : "missing on disk"}
+  row.disabled = busyState;
+  
+  const statusText = project.existsOnDisk ? "Available" : "Missing on disk";
+  
+  row.innerHTML = `
+    <div class="project-info">
+      <div class="project-title">${project.name}</div>
+      <div class="project-status">${statusText}</div>
     </div>
-    <div class="project-hint">
-      ${project.existsOnDisk ? "Open this project in desktop Ghidra" : "This remembered project is no longer available on disk"}
+    <div class="project-path" title="${project.projectPath}">
+      ${project.projectPath}
     </div>
   `;
-  card.addEventListener("click", async () => {
+  
+  row.addEventListener("click", async () => {
     try {
       await launchRememberedProject(project);
     } catch (error) {
       setFormMessage(error.message, "error");
     }
   });
-  card.addEventListener("contextmenu", (e) => showContextMenu(e, project));
-  return card;
+  row.addEventListener("contextmenu", (e) => showContextMenu(e, project));
+  return row;
 }
 
 function renderProjects(projects) {
   projectsListEl.innerHTML = "";
   if (!projects.length) {
     projectsListEl.innerHTML = `
-      <div class="project-card empty-state">
-        <div class="project-title">No remembered projects yet</div>
-        <div class="project-meta">
-          Create a new project or open an existing one to see it listed here.
-        </div>
+      <div class="project-row empty-state">
+        No remembered projects yet. Create a new project or open an existing one.
       </div>
     `;
     return;
   }
 
   for (const project of projects) {
-    projectsListEl.appendChild(createProjectCard(project));
+    projectsListEl.appendChild(createProjectRow(project));
   }
 }
 
