@@ -356,6 +356,80 @@ async function main() {
     });
   });
 
+  ipcMain.handle("headless:prompt-for-rename", async (_event, currentName) => {
+    return new Promise((resolve) => {
+      const defaultValue = typeof currentName === "string" ? currentName : "";
+      const promptWindow = new BrowserWindow({
+        width: 400,
+        height: 180,
+        parent: BrowserWindow.getFocusedWindow(),
+        modal: true,
+        show: false,
+        resizable: false,
+        webPreferences: {
+          nodeIntegration: true,
+          contextIsolation: false
+        }
+      });
+
+      const promptHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: "Segoe UI", sans-serif; background: #252526; color: #ccc; padding: 20px; margin: 0; }
+            h3 { margin-top: 0; margin-bottom: 15px; font-size: 14px; font-weight: 500; color: #fff; }
+            input { width: 100%; padding: 8px; margin-bottom: 15px; background: #3c3c3c; border: 1px solid #3c3c3c; color: #fff; box-sizing: border-box; outline: none; border-radius: 2px; }
+            input:focus { border-color: #007fd4; }
+            .buttons { text-align: right; }
+            button { padding: 6px 16px; margin-left: 8px; border: none; border-radius: 2px; cursor: pointer; }
+            button.ok { background: #007fd4; color: white; }
+            button.cancel { background: transparent; border: 1px solid #454545; color: #ccc; }
+          </style>
+        </head>
+        <body>
+          <h3>Rename Project</h3>
+          <input type="text" id="name" value="${(defaultValue).replace(/"/g, "&quot;")}" autofocus />
+          <div class="buttons">
+            <button class="cancel" id="cancel">Cancel</button>
+            <button class="ok" id="ok">Rename</button>
+          </div>
+          <script>
+            const { ipcRenderer } = require('electron');
+            const input = document.getElementById('name');
+            input.select();
+            document.getElementById('ok').onclick = () => ipcRenderer.send('prompt-rename-result', input.value);
+            document.getElementById('cancel').onclick = () => ipcRenderer.send('prompt-rename-result', null);
+            input.onkeydown = (e) => {
+              if (e.key === 'Enter') ipcRenderer.send('prompt-rename-result', input.value);
+              if (e.key === 'Escape') ipcRenderer.send('prompt-rename-result', null);
+            };
+          </script>
+        </body>
+        </html>
+      `;
+
+      promptWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(promptHtml));
+
+      promptWindow.once('ready-to-show', () => {
+        promptWindow.show();
+      });
+
+      ipcMain.once('prompt-rename-result', (_ev, value) => {
+        promptWindow.close();
+        resolve(value ? value.trim() : null);
+      });
+
+      promptWindow.on('closed', () => {
+        try {
+          ipcMain.removeAllListeners('prompt-rename-result');
+        }
+        catch (_) {}
+        resolve(null);
+      });
+    });
+  });
+
   createWindow();
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -373,6 +447,7 @@ async function main() {
     ipcMain.removeHandler("headless:choose-binary-files");
     ipcMain.removeHandler("headless:launch-desktop-project");
     ipcMain.removeHandler("headless:prompt-for-project-name");
+    ipcMain.removeHandler("headless:prompt-for-rename");
     ipcMain.removeHandler("headless:show-add-binaries-modal");
   });
 }

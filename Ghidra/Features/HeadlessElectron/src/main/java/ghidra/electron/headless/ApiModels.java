@@ -122,6 +122,10 @@ class OpenProjectRequest {
 	String projectName;
 }
 
+class RenameProjectRequest {
+	String name;
+}
+
 class JobProgress {
 	String phase;
 	Integer current;

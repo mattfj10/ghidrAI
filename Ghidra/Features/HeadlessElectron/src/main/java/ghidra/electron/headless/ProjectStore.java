@@ -179,6 +179,26 @@ class ProjectStore {
 		save();
 	}
 
+	synchronized void deleteProject(String projectId) throws IOException {
+		ProjectRecord removed = projectsById.remove(projectId);
+		if (removed == null) {
+			throw new ApiException(404, "PROJECT_NOT_FOUND",
+				"The requested project could not be found.", Map.of("projectId", projectId));
+		}
+		save();
+	}
+
+	synchronized ProjectRecord renameProject(String projectId, String newName) throws IOException {
+		if (newName == null || newName.isBlank()) {
+			throw new ApiException(422, "VALIDATION_ERROR",
+				"Project name cannot be empty.", Map.of("name", newName));
+		}
+		ProjectRecord record = getProject(projectId);
+		record.name = newName.trim();
+		save();
+		return record;
+	}
+
 	private void save() throws IOException {
 		List<ProjectRecord> records = new ArrayList<>(projectsById.values());
 		String json = JsonSupport.GSON.toJson(records);

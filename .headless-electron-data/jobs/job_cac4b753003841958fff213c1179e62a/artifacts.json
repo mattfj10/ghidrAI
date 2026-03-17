@@ -1,0 +1,46 @@
+[
+  {
+    "artifactId": "artifact_01daf8c026df4b449307250c9f4fa06b",
+    "jobId": "job_cac4b753003841958fff213c1179e62a",
+    "name": "application.log",
+    "type": "log",
+    "contentType": "text/plain",
+    "size": 12117,
+    "createdAt": "2026-03-15T18:48:57.831168940Z",
+    "downloadUrl": "/api/v1/jobs/job_cac4b753003841958fff213c1179e62a/artifacts/artifact_01daf8c026df4b449307250c9f4fa06b",
+    "filePath": "/home/tornado711/projects/ghidrAI/ghidra/.headless-electron-data/jobs/job_cac4b753003841958fff213c1179e62a/artifacts/application.log"
+  },
+  {
+    "artifactId": "artifact_f3c57c1f47c841a98d35bc2e9f33cbe1",
+    "jobId": "job_cac4b753003841958fff213c1179e62a",
+    "name": "script.log",
+    "type": "log",
+    "contentType": "text/plain",
+    "size": 0,
+    "createdAt": "2026-03-15T18:48:57.833346945Z",
+    "downloadUrl": "/api/v1/jobs/job_cac4b753003841958fff213c1179e62a/artifacts/artifact_f3c57c1f47c841a98d35bc2e9f33cbe1",
+    "filePath": "/home/tornado711/projects/ghidrAI/ghidra/.headless-electron-data/jobs/job_cac4b753003841958fff213c1179e62a/artifacts/script.log"
+  },
+  {
+    "artifactId": "artifact_6d1712345aaa413aa82b06917fdb4b34",
+    "jobId": "job_cac4b753003841958fff213c1179e62a",
+    "name": "process-output.log",
+    "type": "log",
+    "contentType": "text/plain",
+    "size": 11823,
+    "createdAt": "2026-03-15T18:48:57.833601270Z",
+    "downloadUrl": "/api/v1/jobs/job_cac4b753003841958fff213c1179e62a/artifacts/artifact_6d1712345aaa413aa82b06917fdb4b34",
+    "filePath": "/home/tornado711/projects/ghidrAI/ghidra/.headless-electron-data/jobs/job_cac4b753003841958fff213c1179e62a/artifacts/process-output.log"
+  },
+  {
+    "artifactId": "artifact_9a3fbd487e614c3a9769a61884b0ed30",
+    "jobId": "job_cac4b753003841958fff213c1179e62a",
+    "name": "summary.json",
+    "type": "report",
+    "contentType": "application/json",
+    "size": 137,
+    "createdAt": "2026-03-15T18:48:57.834118976Z",
+    "downloadUrl": "/api/v1/jobs/job_cac4b753003841958fff213c1179e62a/artifacts/artifact_9a3fbd487e614c3a9769a61884b0ed30",
+    "filePath": "/home/tornado711/projects/ghidrAI/ghidra/.headless-electron-data/jobs/job_cac4b753003841958fff213c1179e62a/artifacts/summary.json"
+  }
+]

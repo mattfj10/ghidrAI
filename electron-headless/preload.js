@@ -32,6 +32,12 @@ const fallbackApi = {
   openProject: (projectPath, projectName) =>
     jsonRequest("/api/v1/projects/open", "POST", { projectPath, projectName }),
   clearProjects: () => jsonRequest("/api/v1/projects", "DELETE"),
+  deleteProject: (projectId) =>
+    jsonRequest(`/api/v1/projects/${encodeURIComponent(projectId)}`, "DELETE"),
+  renameProject: (projectId, newName) =>
+    jsonRequest(`/api/v1/projects/${encodeURIComponent(projectId)}`, "PATCH", {
+      name: newName
+    }),
   launchDesktopProject: async () => {
     throw new Error("Native desktop launch is not available.");
   },
@@ -47,6 +53,9 @@ const fallbackApi = {
   promptForProjectName: async () => {
     throw new Error("Native prompt is not available.");
   },
+  promptForRename: async (currentName) => {
+    throw new Error("Native rename prompt is not available.");
+  },
   showAddBinariesModal: async () => {
     throw new Error("Native add-binaries modal is not available.");
   }
@@ -57,6 +66,10 @@ try {
   const api = {
     ...fallbackApi,
     clearProjects: () => fallbackApi.clearProjects(),
+    deleteProject: (projectId) => fallbackApi.deleteProject(projectId),
+    renameProject: (projectId, newName) =>
+      fallbackApi.renameProject(projectId, newName),
+    promptForRename: (currentName) => fallbackApi.promptForRename(currentName),
     chooseCreateProjectDirectory: () => {
       if (!ipcRenderer) {
         throw new Error("Electron IPC bridge is unavailable.");
@@ -86,6 +99,12 @@ try {
         throw new Error("Electron IPC bridge is unavailable.");
       }
       return ipcRenderer.invoke("headless:prompt-for-project-name");
+    },
+    promptForRename: (currentName) => {
+      if (!ipcRenderer) {
+        throw new Error("Electron IPC bridge is unavailable.");
+      }
+      return ipcRenderer.invoke("headless:prompt-for-rename", currentName);
     },
     showAddBinariesModal: () => {
       if (!ipcRenderer) {

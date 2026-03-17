@@ -3,8 +3,6 @@ const projectsListEl = document.getElementById("projectsList");
 const formMessageEl = document.getElementById("formMessage");
 const createProjectBtnEl = document.getElementById("createProjectBtn");
 const openProjectBtnEl = document.getElementById("openProjectBtn");
-const refreshProjectsBtnEl = document.getElementById("refreshProjectsBtn");
-const clearProjectsBtnEl = document.getElementById("clearProjectsBtn");
 const api = window.headlessApi;
 let busyState = false;
 
@@ -30,8 +28,6 @@ function setBusy(nextBusyState) {
   busyState = Boolean(nextBusyState);
   createProjectBtnEl.disabled = busyState;
   openProjectBtnEl.disabled = busyState;
-  refreshProjectsBtnEl.disabled = busyState;
-  clearProjectsBtnEl.disabled = busyState;
   for (const card of document.querySelectorAll(".project-card-action")) {
     card.disabled = busyState;
   }
@@ -68,6 +64,95 @@ async function launchRememberedProject(project) {
   }
 }
 
+function showContextMenu(event, project) {
+  event.preventDefault();
+  closeContextMenu();
+
+  const menu = document.createElement("div");
+  menu.className = "context-menu";
+  menu.dataset.projectId = project.projectId;
+
+  const renameItem = document.createElement("button");
+  renameItem.type = "button";
+  renameItem.className = "context-menu-item";
+  renameItem.textContent = "Rename";
+  renameItem.addEventListener("click", () => {
+    closeContextMenu();
+    handleRenameProject(project);
+  });
+
+  const deleteItem = document.createElement("button");
+  deleteItem.type = "button";
+  deleteItem.className = "context-menu-item context-menu-item-danger";
+  deleteItem.textContent = "Delete from list";
+  deleteItem.addEventListener("click", () => {
+    closeContextMenu();
+    handleDeleteProject(project);
+  });
+
+  menu.appendChild(renameItem);
+  menu.appendChild(deleteItem);
+  menu.style.left = `${event.clientX}px`;
+  menu.style.top = `${event.clientY}px`;
+  document.body.appendChild(menu);
+
+  const rect = menu.getBoundingClientRect();
+  const viewportW = window.innerWidth;
+  const viewportH = window.innerHeight;
+  let left = event.clientX;
+  let top = event.clientY;
+  if (left + rect.width > viewportW) left = viewportW - rect.width - 8;
+  if (top + rect.height > viewportH) top = viewportH - rect.height - 8;
+  if (left < 8) left = 8;
+  if (top < 8) top = 8;
+  menu.style.left = `${left}px`;
+  menu.style.top = `${top}px`;
+
+  const closeOnClickOutside = (e) => {
+    if (!menu.contains(e.target)) {
+      closeContextMenu();
+    }
+    document.removeEventListener("click", closeOnClickOutside);
+  };
+  setTimeout(() => document.addEventListener("click", closeOnClickOutside), 0);
+}
+
+function closeContextMenu() {
+  const existing = document.querySelector(".context-menu");
+  if (existing) existing.remove();
+}
+
+async function handleRenameProject(project) {
+  const newName = await requireApi().promptForRename(project.name);
+  if (newName == null || newName.trim() === "") {
+    return;
+  }
+  try {
+    await requireApi().renameProject(project.projectId, newName.trim());
+    await refreshProjects();
+    setFormMessage(`Renamed project to "${newName.trim()}".`, "success");
+  } catch (error) {
+    setFormMessage(error.message, "error");
+  }
+}
+
+async function handleDeleteProject(project) {
+  if (
+    !confirm(
+      `Remove "${project.name}" from the remembered list? This will not delete the project from disk.`
+    )
+  ) {
+    return;
+  }
+  try {
+    await requireApi().deleteProject(project.projectId);
+    await refreshProjects();
+    setFormMessage(`Removed "${project.name}" from the remembered list.`, "success");
+  } catch (error) {
+    setFormMessage(error.message, "error");
+  }
+}
+
 function createProjectCard(project) {
   const card = document.createElement("button");
   card.type = "button";
@@ -94,6 +179,7 @@ function createProjectCard(project) {
       setFormMessage(error.message, "error");
     }
   });
+  card.addEventListener("contextmenu", (e) => showContextMenu(e, project));
   return card;
 }
 
@@ -208,36 +294,6 @@ openProjectBtnEl.addEventListener("click", async () => {
     await openProject();
   } catch (error) {
     setFormMessage(error.message, "error");
-  }
-});
-
-refreshProjectsBtnEl.addEventListener("click", async () => {
-  try {
-    await refreshProjects();
-    setFormMessage("Remembered project locations refreshed.", "muted");
-  } catch (error) {
-    setFormMessage(error.message, "error");
-  }
-});
-
-clearProjectsBtnEl.addEventListener("click", async () => {
-  if (!confirm("Are you sure you want to clear all projects from the index? This will not delete the projects from disk, only remove them from the remembered list.")) {
-    return;
-  }
-  setBusy(true);
-  setFormMessage("Clearing projects...", "muted");
-  try {
-    const response = await requireApi().clearProjects();
-    console.log("Clear projects response:", response);
-    await refreshProjects();
-    const projectsAfter = await requireApi().listProjects();
-    console.log("Projects after clear:", projectsAfter);
-    setFormMessage("All projects cleared from index.", "success");
-  } catch (error) {
-    console.error("Error clearing projects:", error);
-    setFormMessage(`Error: ${error.message}`, "error");
-  } finally {
-    setBusy(false);
   }
 });
 

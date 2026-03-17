@@ -174,6 +174,20 @@ public class ElectronHeadlessServer {
 						Map.of("project", projectStore.getProject(suffix)));
 					return;
 				}
+				if ("DELETE".equals(method) && !suffix.contains("/")) {
+					projectStore.deleteProject(suffix);
+					JsonSupport.writeEnvelope(exchange, 200, requestId,
+						Map.of("deleted", true, "projectId", suffix));
+					return;
+				}
+				if ("PATCH".equals(method) && !suffix.contains("/")) {
+					RenameProjectRequest request =
+						Objects.requireNonNull(JsonSupport.readJson(exchange, RenameProjectRequest.class));
+					ProjectRecord project = projectStore.renameProject(suffix, request.name);
+					JsonSupport.writeEnvelope(exchange, 200, requestId,
+						Map.of("project", project, "renamed", true));
+					return;
+				}
 			}
 			throw new ApiException(404, "INVALID_REQUEST", "Unknown project endpoint.");
 		}
