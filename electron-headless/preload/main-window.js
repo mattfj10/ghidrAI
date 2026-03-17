@@ -7,6 +7,7 @@ const backendApi = createBackendApi();
 const api = {
   ...backendApi,
   launchDesktopProject: (project) => invoke(IPC_CHANNELS.launchDesktopProject, project),
+  openWorkspace: (project) => invoke(IPC_CHANNELS.openWorkspace, project),
   chooseCreateProjectDirectory: () => invoke(IPC_CHANNELS.chooseCreateProjectDirectory),
   chooseExistingProject: () => invoke(IPC_CHANNELS.chooseExistingProject),
   promptForProjectName: () => invoke(IPC_CHANNELS.promptForProjectName),
