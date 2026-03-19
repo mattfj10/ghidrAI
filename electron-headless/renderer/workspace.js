@@ -1,3 +1,12 @@
+// Track the selected binary for the Code Browser button
+let selectedBinary = null;
+
+function openCodeBrowser(binary) {
+  if (typeof headlessApi !== "undefined" && headlessApi.openCodeBrowser) {
+    headlessApi.openCodeBrowser(binary);
+  }
+}
+
 // Mock data for the tree view
 const mockProjectData = {
   name: "test",
@@ -63,9 +72,21 @@ document.addEventListener("DOMContentLoaded", () => {
       document.querySelectorAll(".tree-item").forEach(el => el.classList.remove("selected"));
       row.classList.add("selected");
       
+      if (item.type === "file") {
+        selectedBinary = { name: item.name };
+      } else {
+        selectedBinary = null;
+      }
+      
       // Handle expand/collapse for folders
       if (item.type === "folder") {
         row.classList.toggle("expanded");
+      }
+    });
+    
+    row.addEventListener("dblclick", () => {
+      if (item.type === "file") {
+        openCodeBrowser({ name: item.name });
       }
     });
     
@@ -99,5 +120,10 @@ document.addEventListener("DOMContentLoaded", () => {
   tabTable.addEventListener("click", () => {
     tabTable.classList.add("active");
     tabTree.classList.remove("active");
+  });
+
+  // Code Browser tool button - opens code browser for selected binary (or empty)
+  document.getElementById("tool-codebrowser").addEventListener("click", () => {
+    openCodeBrowser(selectedBinary);
   });
 });

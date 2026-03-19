@@ -3,10 +3,15 @@ const { showAddBinariesModal } = require("../windows/add-binaries-modal");
 const { promptForProjectName } = require("../windows/project-name-modal");
 const { promptForRename } = require("../windows/rename-modal");
 const { createWorkspaceWindow } = require("../windows/workspace-window");
+const { createCodeBrowserWindow } = require("../windows/code-browser-window");
 
 function registerWindowIpc(ipcMain, BrowserWindow) {
   ipcMain.handle(IPC_CHANNELS.openWorkspace, async (_event, _project) => {
     createWorkspaceWindow(BrowserWindow);
+    return { launched: true };
+  });
+  ipcMain.handle(IPC_CHANNELS.openCodeBrowser, async (_event, binary) => {
+    createCodeBrowserWindow(BrowserWindow, binary || null);
     return { launched: true };
   });
   ipcMain.handle(IPC_CHANNELS.showAddBinariesModal, (event) =>
@@ -22,6 +27,7 @@ function registerWindowIpc(ipcMain, BrowserWindow) {
 
 function removeWindowIpc(ipcMain) {
   ipcMain.removeHandler(IPC_CHANNELS.openWorkspace);
+  ipcMain.removeHandler(IPC_CHANNELS.openCodeBrowser);
   ipcMain.removeHandler(IPC_CHANNELS.showAddBinariesModal);
   ipcMain.removeHandler(IPC_CHANNELS.promptForProjectName);
   ipcMain.removeHandler(IPC_CHANNELS.promptForRename);

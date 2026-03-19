@@ -8,6 +8,7 @@ const api = {
   ...backendApi,
   launchDesktopProject: (project) => invoke(IPC_CHANNELS.launchDesktopProject, project),
   openWorkspace: (project) => invoke(IPC_CHANNELS.openWorkspace, project),
+  openCodeBrowser: (binary) => invoke(IPC_CHANNELS.openCodeBrowser, binary),
   chooseCreateProjectDirectory: () => invoke(IPC_CHANNELS.chooseCreateProjectDirectory),
   chooseExistingProject: () => invoke(IPC_CHANNELS.chooseExistingProject),
   promptForProjectName: () => invoke(IPC_CHANNELS.promptForProjectName),

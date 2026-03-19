@@ -22,12 +22,22 @@ import java.util.Map;
 import ghidra.GhidraApplicationLayout;
 import ghidra.GhidraJarApplicationLayout;
 import ghidra.framework.*;
+import ghidra.framework.model.DomainFile;
+import ghidra.framework.model.DomainFolder;
 import ghidra.framework.model.Project;
 import ghidra.framework.model.ProjectLocator;
 import ghidra.framework.project.DefaultProjectManager;
+import ghidra.program.database.ProgramContentHandler;
+import ghidra.program.model.listing.Instruction;
+import ghidra.program.model.listing.InstructionIterator;
+import ghidra.program.model.listing.Program;
+import ghidra.program.model.mem.MemoryAccessException;
 import ghidra.framework.store.LockException;
 import ghidra.util.NotOwnerException;
+import ghidra.util.exception.CancelledException;
 import ghidra.util.exception.NotFoundException;
+import ghidra.util.exception.VersionException;
+import ghidra.util.task.TaskMonitor;
 
 interface GhidraProjectOps {
 	void ensureGhidraInitialized() throws IOException;
@@ -37,6 +47,9 @@ interface GhidraProjectOps {
 	void validateProjectOpen(String projectDirectory, String projectName) throws IOException;
 
 	boolean projectExists(String projectDirectory, String projectName);
+
+	String readProgramDisassembly(String projectDirectory, String projectName, String programName)
+			throws IOException;
 }
 
 class DefaultGhidraProjectOps implements GhidraProjectOps {
@@ -100,6 +113,132 @@ class DefaultGhidraProjectOps implements GhidraProjectOps {
 	@Override
 	public boolean projectExists(String projectDirectory, String projectName) {
 		return new ProjectLocator(projectDirectory, projectName).getProjectDir().exists();
+	}
+
+	@Override
+	public String readProgramDisassembly(String projectDirectory, String projectName, String programName)
+			throws IOException {
+		ensureInitialized();
+		if (programName == null || programName.isBlank()) {
+			throw new ApiException(422, "VALIDATION_ERROR", "The request failed validation.",
+				Map.of("fields", Map.of("binaryName", "Binary name is required")));
+		}
+
+		ProjectLocator locator = new ProjectLocator(projectDirectory, projectName);
+		ServiceProjectManager pm = new ServiceProjectManager();
+		Project project;
+		try {
+			project = pm.openProject(locator, false, false);
+		}
+		catch (NotFoundException e) {
+			throw new ApiException(404, "PROJECT_NOT_FOUND",
+				"The requested project could not be found.",
+				Map.of("projectPath", locator.getProjectDir().getAbsolutePath()));
+		}
+		catch (NotOwnerException | LockException e) {
+			throw new ApiException(409, "PROJECT_NOT_FOUND",
+				"The requested project could not be opened.",
+				Map.of("projectPath", locator.getProjectDir().getAbsolutePath(), "reason",
+					e.getMessage()));
+		}
+
+		Object consumer = new Object();
+		try {
+			DomainFile file = findProgramFile(project.getProjectData().getRootFolder(), programName);
+			if (file == null) {
+				throw new ApiException(404, "BINARY_NOT_FOUND",
+					"The requested binary could not be found in the active project.",
+					Map.of("binaryName", programName));
+			}
+
+			try {
+				Object domainObject = file.getDomainObject(consumer, true, false, TaskMonitor.DUMMY);
+				if (!(domainObject instanceof Program program)) {
+					throw new ApiException(422, "UNSUPPORTED_BINARY",
+						"The selected file is not a program and cannot be disassembled.",
+						Map.of("binaryName", programName));
+				}
+				try {
+					return formatDisassembly(program);
+				}
+				finally {
+					program.release(consumer);
+				}
+			}
+			catch (VersionException e) {
+				throw new ApiException(409, "PROGRAM_VERSION_ERROR",
+					"The selected binary requires a version upgrade before disassembly.",
+					Map.of("binaryName", programName, "reason", e.getMessage()));
+			}
+			catch (CancelledException e) {
+				throw new ApiException(500, "DISASSEMBLY_CANCELLED",
+					"Disassembly read was cancelled unexpectedly.",
+					Map.of("binaryName", programName));
+			}
+		}
+		finally {
+			project.close();
+		}
+	}
+
+	private DomainFile findProgramFile(DomainFolder folder, String programName) {
+		for (DomainFile file : folder.getFiles()) {
+			if (!ProgramContentHandler.PROGRAM_CONTENT_TYPE.equals(file.getContentType())) {
+				continue;
+			}
+			if (file.getName().equals(programName) || file.getName().equalsIgnoreCase(programName)) {
+				return file;
+			}
+		}
+		for (DomainFolder child : folder.getFolders()) {
+			DomainFile found = findProgramFile(child, programName);
+			if (found != null) {
+				return found;
+			}
+		}
+		return null;
+	}
+
+	private String formatDisassembly(Program program) {
+		StringBuilder out = new StringBuilder();
+		out.append("; Program: ").append(program.getName()).append(System.lineSeparator());
+		out.append("; Address").append("            ").append("Bytes")
+			.append("                    ").append("Instruction")
+			.append(System.lineSeparator()).append(System.lineSeparator());
+
+		InstructionIterator instructions = program.getListing().getInstructions(true);
+		int count = 0;
+		while (instructions.hasNext()) {
+			Instruction instruction = instructions.next();
+			String address = instruction.getAddress().toString();
+			String bytes;
+			try {
+				bytes = toHex(instruction.getBytes());
+			}
+			catch (MemoryAccessException e) {
+				bytes = "<unavailable>";
+			}
+			out.append(String.format("%-18s %-24s %s%n", address, bytes, instruction.toString()));
+			count++;
+		}
+		if (count == 0) {
+			out.append("; No instructions found in this program.").append(System.lineSeparator());
+		}
+		return out.toString();
+	}
+
+	private String toHex(byte[] bytes) {
+		if (bytes == null || bytes.length == 0) {
+			return "";
+		}
+		StringBuilder sb = new StringBuilder(bytes.length * 3);
+		for (int i = 0; i < bytes.length; i++) {
+			if (i > 0) {
+				sb.append(' ');
+			}
+			sb.append(String.format("%02X", bytes[i] & 0xff));
+		}
+		return sb.toString();
 	}
 
 	private static void ensureInitialized() throws IOException {

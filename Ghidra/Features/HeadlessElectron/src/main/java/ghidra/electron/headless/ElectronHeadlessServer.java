@@ -17,6 +17,7 @@ package ghidra.electron.headless;
 
 import java.io.*;
 import java.net.InetSocketAddress;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
@@ -48,6 +49,7 @@ public class ElectronHeadlessServer {
 		server.setExecutor(Executors.newCachedThreadPool());
 		server.createContext("/api/v1/health", this::handleHealth);
 		server.createContext("/api/v1/capabilities", this::handleCapabilities);
+		server.createContext("/api/v1/projects/active/disassembly", this::handleActiveDisassembly);
 		server.createContext("/api/v1/projects", this::handleProjects);
 		server.createContext("/api/v1/jobs", this::handleJobs);
 		server.createContext("/api/v1/events", this::handleEvents);
@@ -90,11 +92,55 @@ public class ElectronHeadlessServer {
 		JsonSupport.writeEnvelope(exchange, 200, requestId, new CapabilityResponse());
 	}
 
+	private void handleActiveDisassembly(HttpExchange exchange) throws IOException {
+		// #region agent log
+		try {
+			String p = exchange.getRequestURI().getPath();
+			Files.writeString(Paths.get("/home/tornado711/.cursor/debug-a7d37d.log"),
+				"{\"sessionId\":\"a7d37d\",\"runId\":\"backend\",\"hypothesisId\":\"H9\",\"location\":\"ElectronHeadlessServer.handleActiveDisassembly\",\"message\":\"disassembly handler hit\",\"data\":{\"path\":\"" + p + "\"},\"timestamp\":" + System.currentTimeMillis() + "}\n",
+				StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+		} catch (Exception ignored) {}
+		// #endregion
+		if (!"GET".equals(exchange.getRequestMethod())) {
+			exchange.sendResponseHeaders(405, -1);
+			return;
+		}
+		String requestId = JsonSupport.requestId(exchange);
+		try {
+			String binaryName = queryParam(exchange.getRequestURI().getRawQuery(), "binaryName");
+			if (binaryName == null || binaryName.isBlank()) {
+				throw new ApiException(422, "VALIDATION_ERROR", "The request failed validation.",
+					Map.of("fields", Map.of("binaryName", "Query parameter is required")));
+			}
+			String disassembly = projectStore.readActiveProjectDisassembly(binaryName);
+			ProjectRecord active = projectStore.getActiveProject();
+			JsonSupport.writeEnvelope(exchange, 200, requestId,
+				Map.of("projectId", active.projectId, "binaryName", binaryName, "disassembly",
+					disassembly));
+		}
+		catch (ApiException e) {
+			JsonSupport.writeError(exchange, e.statusCode, requestId, e.error);
+		}
+		catch (Exception e) {
+			JsonSupport.writeError(exchange, 500, requestId,
+				new ApiError("INTERNAL_ERROR", e.getMessage(), null));
+		}
+	}
+
 	private void handleProjects(HttpExchange exchange) throws IOException {
 		String requestId = JsonSupport.requestId(exchange);
 		try {
 			String path = exchange.getRequestURI().getPath();
 			String method = exchange.getRequestMethod();
+			// #region agent log
+			if (path != null && path.contains("disassembly")) {
+				try {
+					Files.writeString(Paths.get("/home/tornado711/.cursor/debug-a7d37d.log"),
+						"{\"sessionId\":\"a7d37d\",\"runId\":\"backend\",\"hypothesisId\":\"H10\",\"location\":\"ElectronHeadlessServer.handleProjects\",\"message\":\"disassembly request hit projects handler\",\"data\":{\"path\":\"" + path + "\",\"method\":\"" + method + "\"},\"timestamp\":" + System.currentTimeMillis() + "}\n",
+						StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+				} catch (Exception ignored) {}
+			}
+			// #endregion
 			if ("/api/v1/projects".equals(path)) {
 				if ("DELETE".equals(method)) {
 					try {
@@ -310,6 +356,19 @@ public class ElectronHeadlessServer {
 			}
 		}
 		return 0;
+	}
+
+	private String queryParam(String rawQuery, String key) {
+		if (rawQuery == null || rawQuery.isBlank()) {
+			return null;
+		}
+		for (String pair : rawQuery.split("&")) {
+			String[] parts = pair.split("=", 2);
+			if (parts.length == 2 && key.equals(parts[0])) {
+				return URLDecoder.decode(parts[1], StandardCharsets.UTF_8);
+			}
+		}
+		return null;
 	}
 
 	private Object sanitize(List<ArtifactRecord> records) {

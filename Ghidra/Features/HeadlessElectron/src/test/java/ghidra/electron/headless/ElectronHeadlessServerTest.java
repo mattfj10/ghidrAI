@@ -116,6 +116,21 @@ public class ElectronHeadlessServerTest extends AbstractGenericTest {
 		}
 	}
 
+	@Test
+	public void testActiveProjectDisassemblyEndpoint() throws Exception {
+		sendJson("/api/v1/projects", "POST",
+			("{\"projectPath\":\"%s\",\"projectName\":\"disasm-alpha\"}")
+				.formatted(tempDir.toString().replace("\\", "\\\\")));
+		sendJson("/api/v1/projects/open", "POST",
+			("{\"projectPath\":\"%s\",\"projectName\":\"disasm-alpha\"}")
+				.formatted(tempDir.toString().replace("\\", "\\\\")));
+
+		JsonObject response =
+			getJson("/api/v1/projects/active/disassembly?binaryName=test.bin");
+		assertEquals("test.bin", response.getAsJsonObject("data").get("binaryName").getAsString());
+		assertTrue(response.getAsJsonObject("data").get("disassembly").getAsString().contains("NOP"));
+	}
+
 	private JsonObject getJson(String path) throws Exception {
 		return JsonSupport.GSON.fromJson(send(path, "GET", null).body(), JsonObject.class);
 	}

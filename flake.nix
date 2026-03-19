@@ -186,31 +186,27 @@
             }
             trap cleanup EXIT INT TERM
 
-            if curl -fsS "$GHIDRA_BACKEND_URL/api/v1/health" >/dev/null 2>&1; then
-              echo "Reusing existing headless backend at $GHIDRA_BACKEND_URL..."
-            else
-              echo "Starting headless backend on $GHIDRA_BACKEND_URL..."
-              "$repo/Ghidra/RuntimeScripts/Linux/support/launch.sh" \
-                fg jdk Ghidra-Electron-Headless 2G "-Djava.awt.headless=true" \
-                ghidra.electron.headless.ElectronHeadlessLaunchable \
-                "$GHIDRA_ELECTRON_PORT" \
-                "$GHIDRA_ELECTRON_DATA_DIR" \
-                "$repo" &
-              backend_pid="$!"
+            echo "Starting headless backend on $GHIDRA_BACKEND_URL..."
+            "$repo/Ghidra/RuntimeScripts/Linux/support/launch.sh" \
+              fg jdk Ghidra-Electron-Headless 2G "-Djava.awt.headless=true" \
+              ghidra.electron.headless.ElectronHeadlessLaunchable \
+              "$GHIDRA_ELECTRON_PORT" \
+              "$GHIDRA_ELECTRON_DATA_DIR" \
+              "$repo" &
+            backend_pid="$!"
 
-              ready=0
-              echo "Waiting for Ghidra to initialize (this may take 60-90 seconds on first run)..."
-              for _ in $(seq 1 480); do
-                if curl -fsS "$GHIDRA_BACKEND_URL/api/v1/health" >/dev/null; then
-                  ready=1
-                  break
-                fi
-                sleep 0.25
-              done
-              if [ "$ready" -ne 1 ]; then
-                echo "Backend failed to become healthy at $GHIDRA_BACKEND_URL" >&2
-                exit 1
+            ready=0
+            echo "Waiting for Ghidra to initialize (this may take 60-90 seconds on first run)..."
+            for _ in $(seq 1 480); do
+              if curl -fsS "$GHIDRA_BACKEND_URL/api/v1/health" >/dev/null; then
+                ready=1
+                break
               fi
+              sleep 0.25
+            done
+            if [ "$ready" -ne 1 ]; then
+              echo "Backend failed to become healthy at $GHIDRA_BACKEND_URL" >&2
+              exit 1
             fi
 
             electron "$repo/electron-headless" "$@"
