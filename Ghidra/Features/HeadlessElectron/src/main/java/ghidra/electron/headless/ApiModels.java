@@ -92,6 +92,7 @@ class ScriptSpec {
 
 class ImportAnalyzeRequest {
 	String inputPath;
+	List<String> inputPaths = new ArrayList<>();
 	Boolean recursive;
 	Boolean readOnly;
 	Boolean noAnalysis;
@@ -119,6 +120,10 @@ class OpenProjectRequest {
 	String projectId;
 	String projectPath;
 	String projectName;
+}
+
+class RenameProjectRequest {
+	String name;
 }
 
 class JobProgress {

@@ -130,7 +130,14 @@ class ScriptProcessExecutionEngine implements HeadlessExecutionEngine {
 		command.add(projectDir);
 		command.add(projectName);
 		command.add("-import");
-		command.add(request.inputPath);
+		List<String> paths = request.inputPaths != null && !request.inputPaths.isEmpty()
+			? request.inputPaths
+			: (request.inputPath != null && !request.inputPath.isBlank()
+				? List.of(request.inputPath)
+				: List.<String>of());
+		for (String p : paths) {
+			command.add(p);
+		}
 		command.add("-log");
 		command.add(appLog.toString());
 		command.add("-scriptlog");

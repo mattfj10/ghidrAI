@@ -22,6 +22,10 @@ import java.util.*;
 
 class FakeProjectOps implements GhidraProjectOps {
 	@Override
+	public void ensureGhidraInitialized() throws IOException {
+	}
+
+	@Override
 	public void createProject(String projectDirectory, String projectName) throws IOException {
 		Files.createDirectories(Paths.get(projectDirectory, projectName));
 	}

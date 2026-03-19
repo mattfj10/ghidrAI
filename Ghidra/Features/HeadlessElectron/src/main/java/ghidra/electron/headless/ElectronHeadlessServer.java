@@ -53,7 +53,20 @@ public class ElectronHeadlessServer {
 		server.createContext("/api/v1/events", this::handleEvents);
 	}
 
-	public void start() {
+	public void start() throws IOException {
+		// Initialize Ghidra before starting the HTTP server so the first create/open
+		// project request does not block for 30-60+ seconds. The launch script waits
+		// for /api/v1/health before opening the Electron window, so the user sees the
+		// UI only after Ghidra is ready.
+		try {
+			projectStore.ensureGhidraInitialized();
+		}
+		catch (IOException e) {
+			throw e;
+		}
+		catch (Exception e) {
+			throw new IOException("Ghidra initialization failed", e);
+		}
 		server.start();
 	}
 
@@ -83,6 +96,17 @@ public class ElectronHeadlessServer {
 			String path = exchange.getRequestURI().getPath();
 			String method = exchange.getRequestMethod();
 			if ("/api/v1/projects".equals(path)) {
+				if ("DELETE".equals(method)) {
+					try {
+						projectStore.clearAllProjects();
+						JsonSupport.writeEnvelope(exchange, 200, requestId,
+							Map.of("cleared", true, "message", "All projects cleared from index"));
+					} catch (IOException e) {
+						throw new ApiException(500, "CLEAR_FAILED",
+							"Failed to clear projects: " + e.getMessage(), null);
+					}
+					return;
+				}
 				if ("GET".equals(method)) {
 					JsonSupport.writeEnvelope(exchange, 200, requestId,
 						Map.of("projects", projectStore.listProjects()));
@@ -118,6 +142,8 @@ public class ElectronHeadlessServer {
 					projectStore.openProjectByPathAndName(request.projectPath, request.projectName);
 				ImportAnalyzeRequest importRequest = new ImportAnalyzeRequest();
 				importRequest.inputPath = request.inputPath;
+				importRequest.inputPaths =
+					request.inputPaths != null ? new ArrayList<>(request.inputPaths) : null;
 				importRequest.recursive = request.recursive;
 				importRequest.readOnly = request.readOnly;
 				importRequest.noAnalysis = request.noAnalysis;
@@ -146,6 +172,20 @@ public class ElectronHeadlessServer {
 				if ("GET".equals(method) && !suffix.contains("/")) {
 					JsonSupport.writeEnvelope(exchange, 200, requestId,
 						Map.of("project", projectStore.getProject(suffix)));
+					return;
+				}
+				if ("DELETE".equals(method) && !suffix.contains("/")) {
+					projectStore.deleteProject(suffix);
+					JsonSupport.writeEnvelope(exchange, 200, requestId,
+						Map.of("deleted", true, "projectId", suffix));
+					return;
+				}
+				if ("PATCH".equals(method) && !suffix.contains("/")) {
+					RenameProjectRequest request =
+						Objects.requireNonNull(JsonSupport.readJson(exchange, RenameProjectRequest.class));
+					ProjectRecord project = projectStore.renameProject(suffix, request.name);
+					JsonSupport.writeEnvelope(exchange, 200, requestId,
+						Map.of("project", project, "renamed", true));
 					return;
 				}
 			}

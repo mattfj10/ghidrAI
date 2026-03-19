@@ -60,8 +60,8 @@ class HeadlessJobManager {
 		jobs.put(job.jobId, job);
 		activeJobId = job.jobId;
 		eventBroker.publish("job.created", Map.of("jobId", job.jobId, "timestamp", job.createdAt,
-			"state", job.state, "mode", job.mode, "projectId", job.projectId, "inputPath",
-			job.request.inputPath));
+			"state", job.state, "mode", job.mode, "projectId", job.projectId, "inputPaths",
+			job.request.inputPaths));
 		futures.put(job.jobId, executor.submit(() -> runJob(project, job)));
 		return job;
 	}
@@ -176,8 +176,22 @@ class HeadlessJobManager {
 		if (request == null) {
 			throw new ApiException(400, "INVALID_REQUEST", "Request body is required.");
 		}
-		if (request.inputPath == null || request.inputPath.isBlank()) {
-			fieldErrors.put("inputPath", "Path is required");
+		boolean hasPaths = request.inputPaths != null && !request.inputPaths.isEmpty();
+		boolean hasPath =
+			request.inputPath != null && !request.inputPath.isBlank();
+		if (!hasPaths && !hasPath) {
+			fieldErrors.put("inputPath", "Path or paths required");
+		}
+		else if (hasPaths) {
+			for (int i = 0; i < request.inputPaths.size(); i++) {
+				String p = request.inputPaths.get(i);
+				if (p == null || p.isBlank()) {
+					fieldErrors.put("inputPaths[" + i + "]", "Path cannot be empty");
+				}
+				else if (!Files.exists(Paths.get(p))) {
+					fieldErrors.put("inputPaths[" + i + "]", "Path does not exist: " + p);
+				}
+			}
 		}
 		else if (!Files.exists(Paths.get(request.inputPath))) {
 			fieldErrors.put("inputPath", "Path does not exist");
@@ -196,7 +210,12 @@ class HeadlessJobManager {
 
 	private ImportAnalyzeRequest normalize(ImportAnalyzeRequest request) {
 		ImportAnalyzeRequest normalized = new ImportAnalyzeRequest();
-		normalized.inputPath = request.inputPath;
+		if (request.inputPaths != null && !request.inputPaths.isEmpty()) {
+			normalized.inputPaths = new ArrayList<>(request.inputPaths);
+		}
+		else if (request.inputPath != null && !request.inputPath.isBlank()) {
+			normalized.inputPaths = new ArrayList<>(List.of(request.inputPath));
+		}
 		normalized.recursive = Boolean.TRUE.equals(request.recursive);
 		normalized.readOnly = Boolean.TRUE.equals(request.readOnly);
 		normalized.noAnalysis = Boolean.TRUE.equals(request.noAnalysis);

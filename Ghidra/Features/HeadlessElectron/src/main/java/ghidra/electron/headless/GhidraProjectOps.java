@@ -30,6 +30,8 @@ import ghidra.util.NotOwnerException;
 import ghidra.util.exception.NotFoundException;
 
 interface GhidraProjectOps {
+	void ensureGhidraInitialized() throws IOException;
+
 	void createProject(String projectDirectory, String projectName) throws IOException;
 
 	void validateProjectOpen(String projectDirectory, String projectName) throws IOException;
@@ -41,6 +43,11 @@ class DefaultGhidraProjectOps implements GhidraProjectOps {
 	private static final Object INIT_LOCK = new Object();
 
 	DefaultGhidraProjectOps() throws IOException {
+	}
+
+	@Override
+	public void ensureGhidraInitialized() throws IOException {
+		ensureInitialized();
 	}
 
 	@Override

@@ -54,4 +54,30 @@ public class ProjectStoreTest extends AbstractGenericTest {
 		assertEquals("persisted-project", remembered.name);
 		assertEquals(created.projectPath, remembered.projectPath);
 	}
+
+	@Test
+	public void testLegacyRepSuffixRecordIsNormalizedAndDetected() throws Exception {
+		Path tempDir = createTempDirectory("headless-project-store-legacy");
+		EventBroker broker = new EventBroker();
+		Files.createDirectories(tempDir.resolve("legacy-project"));
+		Files.writeString(tempDir.resolve("projects.json"),
+			"""
+			[
+			  {
+			    "projectId": "proj_legacy",
+			    "name": "legacy-project",
+			    "projectPath": "%s",
+			    "lastOpenedAt": null,
+			    "createdAt": "2026-03-15T00:00:00Z",
+			    "existsOnDisk": false,
+			    "isActive": false
+			  }
+			]
+			""".formatted(tempDir.resolve("legacy-project.rep").toString().replace("\\", "\\\\")));
+
+		ProjectStore store = new ProjectStore(tempDir, new FakeProjectOps(), broker);
+		ProjectRecord remembered = store.getProject("proj_legacy");
+		assertEquals(tempDir.resolve("legacy-project").toString(), remembered.projectPath);
+		assertTrue(remembered.existsOnDisk);
+	}
 }
