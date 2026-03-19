@@ -1,0 +1,356 @@
+:root {
+  color-scheme: dark;
+  --bg: #0a0a0a;
+  --panel: #161616;
+  --panel-border: #2a2a2a;
+  --text: #eeeeee;
+  --muted: #888888;
+  --accent: #333333;
+  --accent-hover: #444444;
+  --accent-blue: #007fd4;
+  --accent-blue-hover: #1a8ae6;
+  --danger: #bf4a6a;
+  --ok: #28b887;
+  --tree-hover: rgba(255, 255, 255, 0.05);
+  --tree-selected: rgba(0, 127, 212, 0.3);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  height: 100vh;
+  font-family: Inter, system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
+}
+
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 8px;
+  gap: 8px;
+}
+
+/* --- Top Navigation --- */
+.top-nav {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+.menu-bar {
+  display: flex;
+  gap: 4px;
+  padding: 4px 8px;
+}
+
+.menu-item {
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-size: 13px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 100ms ease;
+}
+
+.menu-item:hover {
+  background: var(--accent);
+}
+
+.global-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.toolbar-btn {
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  transition: background 100ms ease, color 100ms ease;
+}
+
+.toolbar-btn:hover {
+  background: var(--accent);
+  color: var(--text);
+}
+
+.toolbar-separator {
+  width: 1px;
+  height: 16px;
+  background: var(--panel-border);
+  margin: 0 4px;
+}
+
+/* --- Panels --- */
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.panel-header {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--panel-border);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* --- Tool Chest --- */
+.tool-chest-panel {
+  flex-shrink: 0;
+}
+
+.tool-chest-icons {
+  display: flex;
+  gap: 8px;
+  padding: 8px 12px;
+}
+
+.tool-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 100ms ease, border-color 100ms ease;
+}
+
+.tool-btn:hover {
+  background: var(--accent);
+  border-color: var(--panel-border);
+}
+
+/* --- Tree View & Workspace Content --- */
+.tree-view-container {
+  flex: 1;
+  overflow: auto;
+  padding: 8px 0;
+  background: var(--bg);
+}
+
+.tree-root {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.tree-item {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text);
+  user-select: none;
+}
+
+.tree-item:hover {
+  background: var(--tree-hover);
+}
+
+.tree-item.selected {
+  background: var(--tree-selected);
+}
+
+.tree-indent {
+  width: 16px;
+  height: 100%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.tree-chevron {
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 4px;
+  color: var(--muted);
+  font-size: 10px;
+  transition: transform 100ms ease;
+}
+
+.tree-item.expanded .tree-chevron {
+  transform: rotate(90deg);
+}
+
+.tree-icon {
+  width: 16px;
+  height: 16px;
+  margin-right: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tree-children {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: none;
+}
+
+.tree-item.expanded + .tree-children {
+  display: block;
+}
+
+/* --- Filter Bar --- */
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-top: 1px solid var(--panel-border);
+  background: var(--panel);
+}
+
+.filter-bar label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.filter-input-wrapper {
+  flex: 1;
+  display: flex;
+  position: relative;
+}
+
+.filter-input-wrapper input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  color: var(--text);
+  padding: 4px 24px 4px 8px;
+  font-size: 12px;
+  outline: none;
+}
+
+.filter-input-wrapper input:focus {
+  border-color: #555;
+}
+
+.filter-clear-btn {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 2px;
+}
+
+.filter-clear-btn:hover {
+  background: var(--accent);
+  color: var(--text);
+}
+
+/* --- View Tabs --- */
+.view-tabs {
+  display: flex;
+  border-top: 1px solid var(--panel-border);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.tab {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  padding: 6px 16px;
+  font-size: 12px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color 100ms ease, border-color 100ms ease;
+}
+
+.tab:hover {
+  color: var(--text);
+}
+
+.tab.active {
+  color: var(--text);
+  border-bottom-color: var(--accent-blue);
+}
+
+/* --- Running Tools --- */
+.running-tools-panel {
+  flex-shrink: 0;
+}
+
+.running-tools-content {
+  padding: 8px 12px;
+}
+
+.modern-select {
+  width: 200px;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  outline: none;
+  cursor: pointer;
+}
+
+.modern-select:focus {
+  border-color: #555;
+}
+
+/* --- Status Bar --- */
+.status-bar {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 8px;
+  font-size: 11px;
+  color: var(--muted);
+  border-top: 1px solid var(--panel-border);
+}
+
+.status-indicators {
+  display: flex;
+  gap: 8px;
+}
+
+.status-icon {
+  width: 14px;
+  height: 14px;
+  display: inline-block;
+  opacity: 0.7;
+}

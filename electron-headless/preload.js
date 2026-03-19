@@ -41,6 +41,9 @@ const fallbackApi = {
   launchDesktopProject: async () => {
     throw new Error("Native desktop launch is not available.");
   },
+  openWorkspace: async () => {
+    throw new Error("Native workspace launch is not available.");
+  },
   chooseCreateProjectDirectory: async () => {
     throw new Error("Native create-project picker is not available.");
   },
@@ -89,10 +92,17 @@ try {
       return ipcRenderer.invoke("headless:choose-binary-files");
     },
     launchDesktopProject: (project) => {
+      // Redirect to workspace window instead of desktop Ghidra
       if (!ipcRenderer) {
         throw new Error("Electron IPC bridge is unavailable.");
       }
-      return ipcRenderer.invoke("headless:launch-desktop-project", project);
+      return ipcRenderer.invoke("headless:open-workspace", project);
+    },
+    openWorkspace: (project) => {
+      if (!ipcRenderer) {
+        throw new Error("Electron IPC bridge is unavailable.");
+      }
+      return ipcRenderer.invoke("headless:open-workspace", project);
     },
     promptForProjectName: () => {
       if (!ipcRenderer) {

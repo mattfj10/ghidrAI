@@ -128,7 +128,32 @@ async function main() {
     });
   }
 
+  function openWorkspaceWindow(project) {
+    const window = new BrowserWindow({
+      width: 1200,
+      height: 800,
+      minWidth: 900,
+      minHeight: 640,
+      webPreferences: {
+        preload: path.join(__dirname, "preload.js"),
+        contextIsolation: false,
+        sandbox: false
+      }
+    });
+
+    window.loadFile(path.join(__dirname, "renderer", "workspace.html"));
+    
+    // We could pass the project data via webContents.send, but for now we just open it
+    // window.webContents.once('did-finish-load', () => {
+    //   window.webContents.send('load-project', project);
+    // });
+  }
+
   await app.whenReady();
+  ipcMain.handle("headless:open-workspace", async (_event, project) => {
+    openWorkspaceWindow(project);
+    return { launched: true };
+  });
   ipcMain.handle("headless:choose-create-project-directory", async () => {
     const result = await dialog.showOpenDialog({
       title: "Choose New Project Location",
@@ -450,6 +475,7 @@ async function main() {
     ipcMain.removeHandler("headless:choose-existing-project");
     ipcMain.removeHandler("headless:choose-binary-files");
     ipcMain.removeHandler("headless:launch-desktop-project");
+    ipcMain.removeHandler("headless:open-workspace");
     ipcMain.removeHandler("headless:prompt-for-project-name");
     ipcMain.removeHandler("headless:prompt-for-rename");
     ipcMain.removeHandler("headless:show-add-binaries-modal");

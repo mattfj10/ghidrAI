@@ -55,10 +55,13 @@ async function launchRememberedProject(project) {
   }
 
   setBusy(true);
-  setFormMessage(`Launching ${project.name} in Ghidra...`, "muted");
+  setFormMessage(`Opening ${project.name} workspace...`, "muted");
   try {
-    await requireApi().launchDesktopProject(project);
-    setFormMessage(`Launched ${project.name} in Ghidra.`, "success");
+    // We now open the new workspace UI instead of desktop Ghidra
+    await requireApi().openWorkspace(project);
+    setFormMessage(`Opened ${project.name} workspace.`, "success");
+  } catch (error) {
+    setFormMessage(error.message, "error");
   } finally {
     setBusy(false);
   }
