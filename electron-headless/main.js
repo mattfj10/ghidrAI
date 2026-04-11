@@ -2,6 +2,19 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { spawn } = require("node:child_process");
 
+const IPC_CHANNELS = {
+  chooseCreateProjectDirectory: "headless:choose-create-project-directory",
+  chooseExistingProject: "headless:choose-existing-project",
+  chooseBinaryFiles: "headless:choose-binary-files",
+  launchDesktopProject: "headless:launch-desktop-project",
+  showAddBinariesModal: "headless:show-add-binaries-modal",
+  promptForProjectName: "headless:prompt-for-project-name",
+  promptForRename: "headless:prompt-for-rename",
+  addBinariesResult: "add-binaries-result",
+  promptResult: "prompt-result",
+  promptRenameResult: "prompt-rename-result"
+};
+
 async function loadElectronMain() {
   try {
     return require("electron");
@@ -17,169 +30,145 @@ async function loadElectronMain() {
   }
 }
 
-async function main() {
-  const electron = await loadElectronMain();
-  const { app, BrowserWindow, dialog, ipcMain } = electron;
-  if (!app || !BrowserWindow || !dialog || !ipcMain) {
-    throw new Error("Electron main-process APIs are unavailable.");
+function createWindow(BrowserWindow) {
+  const window = new BrowserWindow({
+    width: 1060,
+    height: 760,
+    minWidth: 900,
+    minHeight: 640,
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+      contextIsolation: false,
+      sandbox: false
+    }
+  });
+
+  window.loadFile(path.join(__dirname, "renderer", "index.html"));
+  return window;
+}
+
+function normalizeProjectSelection(selectedPath) {
+  const basename = path.basename(selectedPath);
+  if (basename.endsWith(".gpr")) {
+    return {
+      selectedPath,
+      projectPath: path.dirname(selectedPath),
+      projectName: basename.slice(0, -".gpr".length)
+    };
   }
-
-  const repoRoot = path.resolve(__dirname, "..");
-
-  function createWindow() {
-    const window = new BrowserWindow({
-      width: 1060,
-      height: 760,
-      minWidth: 900,
-      minHeight: 640,
-      webPreferences: {
-        preload: path.join(__dirname, "preload.js"),
-        contextIsolation: false,
-        sandbox: false
-      }
-    });
-
-    window.loadFile(path.join(__dirname, "renderer", "index.html"));
+  if (basename.endsWith(".rep")) {
+    return {
+      selectedPath,
+      projectPath: path.dirname(selectedPath),
+      projectName: basename.slice(0, -".rep".length)
+    };
   }
-
-  function normalizeProjectSelection(selectedPath) {
-    const basename = path.basename(selectedPath);
-    if (basename.endsWith(".gpr")) {
+  if (fs.existsSync(selectedPath) && fs.lstatSync(selectedPath).isDirectory()) {
+    const entries = fs.readdirSync(selectedPath);
+    const projectNames = entries
+      .filter((entry) => entry.endsWith(".gpr"))
+      .map((entry) => entry.slice(0, -".gpr".length))
+      .filter((name) => entries.includes(`${name}.rep`));
+    if (projectNames.length === 1) {
       return {
         selectedPath,
-        projectPath: path.dirname(selectedPath),
-        projectName: basename.slice(0, -".gpr".length)
+        projectPath: selectedPath,
+        projectName: projectNames[0]
       };
     }
-    if (basename.endsWith(".rep")) {
-      return {
-        selectedPath,
-        projectPath: path.dirname(selectedPath),
-        projectName: basename.slice(0, -".rep".length)
-      };
+    if (projectNames.length > 1) {
+      throw new Error(
+        "The selected folder contains multiple Ghidra projects. Select a specific .gpr file or .rep directory."
+      );
     }
-    if (fs.existsSync(selectedPath) && fs.lstatSync(selectedPath).isDirectory()) {
-      const entries = fs.readdirSync(selectedPath);
-      const projectNames = entries
-        .filter((entry) => entry.endsWith(".gpr"))
-        .map((entry) => entry.slice(0, -".gpr".length))
-        .filter((name) => entries.includes(`${name}.rep`));
-      if (projectNames.length === 1) {
-        return {
-          selectedPath,
-          projectPath: selectedPath,
-          projectName: projectNames[0]
-        };
-      }
-      if (projectNames.length > 1) {
-        throw new Error(
-          "The selected folder contains multiple Ghidra projects. Select a specific .gpr file or .rep directory."
-        );
-      }
-    }
-    throw new Error(
-      "Select a Ghidra project file (.gpr), project directory (.rep), or a folder containing exactly one project."
-    );
+  }
+  throw new Error(
+    "Select a Ghidra project file (.gpr), project directory (.rep), or a folder containing exactly one project."
+  );
+}
+
+function getDesktopLauncherPath(repoRoot) {
+  if (process.platform === "linux") {
+    return path.join(repoRoot, "Ghidra", "RuntimeScripts", "Linux", "ghidraRun");
+  }
+  if (process.platform === "win32") {
+    return path.join(repoRoot, "Ghidra", "RuntimeScripts", "Windows", "ghidraRun.bat");
+  }
+  throw new Error(`Desktop Ghidra launch is not supported on ${process.platform}.`);
+}
+
+function toProjectFilePath(project) {
+  if (!project || typeof project.projectPath !== "string" || !project.projectPath.trim()) {
+    throw new Error("Missing remembered project path.");
+  }
+  const normalizedProjectPath = project.projectPath.endsWith(".gpr")
+    ? project.projectPath
+    : `${project.projectPath}.gpr`;
+  return path.resolve(normalizedProjectPath);
+}
+
+function launchDesktopProject(project, repoRoot) {
+  const projectFilePath = toProjectFilePath(project);
+  if (!fs.existsSync(projectFilePath)) {
+    throw new Error(`Project file not found: ${projectFilePath}`);
   }
 
-  function getDesktopLauncherPath() {
-    if (process.platform === "linux") {
-      return path.join(repoRoot, "Ghidra", "RuntimeScripts", "Linux", "ghidraRun");
-    }
-    if (process.platform === "win32") {
-      return path.join(repoRoot, "Ghidra", "RuntimeScripts", "Windows", "ghidraRun.bat");
-    }
-    throw new Error(`Desktop Ghidra launch is not supported on ${process.platform}.`);
+  const launcherPath = getDesktopLauncherPath(repoRoot);
+  if (!fs.existsSync(launcherPath)) {
+    throw new Error(`Could not find Ghidra launcher: ${launcherPath}`);
   }
 
-  function toProjectFilePath(project) {
-    if (!project || typeof project.projectPath !== "string" || !project.projectPath.trim()) {
-      throw new Error("Missing remembered project path.");
-    }
-    const normalizedProjectPath = project.projectPath.endsWith(".gpr")
-      ? project.projectPath
-      : `${project.projectPath}.gpr`;
-    return path.resolve(normalizedProjectPath);
+  return new Promise((resolve, reject) => {
+    const child = spawn(launcherPath, [projectFilePath], {
+      cwd: repoRoot,
+      detached: true,
+      stdio: "ignore",
+      shell: process.platform === "win32"
+    });
+    child.once("error", reject);
+    child.once("spawn", () => {
+      child.unref();
+      resolve({ launched: true, projectFilePath });
+    });
+  });
+}
+
+async function chooseCreateProjectDirectory(dialog) {
+  const result = await dialog.showOpenDialog({
+    title: "Choose New Project Location",
+    properties: ["openDirectory", "createDirectory"]
+  });
+  if (result.canceled || !result.filePaths.length) {
+    return null;
   }
+  return result.filePaths[0];
+}
 
-  function launchDesktopProject(project) {
-    const projectFilePath = toProjectFilePath(project);
-    if (!fs.existsSync(projectFilePath)) {
-      throw new Error(`Project file not found: ${projectFilePath}`);
-    }
-
-    const launcherPath = getDesktopLauncherPath();
-    if (!fs.existsSync(launcherPath)) {
-      throw new Error(`Could not find Ghidra launcher: ${launcherPath}`);
-    }
-
-    return new Promise((resolve, reject) => {
-      const child = spawn(launcherPath, [projectFilePath], {
-        cwd: repoRoot,
-        detached: true,
-        stdio: "ignore",
-        shell: process.platform === "win32"
-      });
-      child.once("error", reject);
-      child.once("spawn", () => {
-        child.unref();
-        resolve({ launched: true, projectFilePath });
-      });
-    });
+async function chooseExistingProject(dialog) {
+  const result = await dialog.showOpenDialog({
+    title: "Open Ghidra Project",
+    properties: ["openFile", "openDirectory"],
+    filters: [{ name: "Ghidra Projects", extensions: ["gpr", "rep"] }]
+  });
+  if (result.canceled || !result.filePaths.length) {
+    return null;
   }
+  return normalizeProjectSelection(result.filePaths[0]);
+}
 
-  await app.whenReady();
-  ipcMain.handle("headless:choose-create-project-directory", async () => {
-    const result = await dialog.showOpenDialog({
-      title: "Choose New Project Location",
-      properties: ["openDirectory", "createDirectory"]
-    });
-    if (result.canceled || !result.filePaths.length) {
-      return null;
-    }
-    return result.filePaths[0];
+async function chooseBinaryFiles(dialog) {
+  const result = await dialog.showOpenDialog({
+    title: "Add Binaries to Project",
+    properties: ["openFile", "multiSelections"]
   });
-  ipcMain.handle("headless:choose-existing-project", async () => {
-    const result = await dialog.showOpenDialog({
-      title: "Open Ghidra Project",
-      properties: ["openFile", "openDirectory"],
-      filters: [{ name: "Ghidra Projects", extensions: ["gpr", "rep"] }]
-    });
-    if (result.canceled || !result.filePaths.length) {
-      return null;
-    }
-    return normalizeProjectSelection(result.filePaths[0]);
-  });
-  ipcMain.handle("headless:choose-binary-files", async () => {
-    const result = await dialog.showOpenDialog({
-      title: "Add Binaries to Project",
-      properties: ["openFile", "multiSelections"]
-    });
-    if (result.canceled || !result.filePaths.length) {
-      return null;
-    }
-    return result.filePaths;
-  });
-  ipcMain.handle("headless:launch-desktop-project", async (_event, project) => {
-    return launchDesktopProject(project);
-  });
-  
-  ipcMain.handle("headless:show-add-binaries-modal", () => {
-    return new Promise((resolve) => {
-      const addBinariesWindow = new BrowserWindow({
-        width: 520,
-        height: 420,
-        parent: BrowserWindow.getFocusedWindow(),
-        modal: true,
-        show: false,
-        resizable: true,
-        webPreferences: {
-          nodeIntegration: true,
-          contextIsolation: false
-        }
-      });
+  if (result.canceled || !result.filePaths.length) {
+    return null;
+  }
+  return result.filePaths;
+}
 
-      const addBinariesHtml = `
+function getAddBinariesModalHtml() {
+  return `
         <!DOCTYPE html>
         <html>
         <head>
@@ -239,7 +228,7 @@ async function main() {
             }
 
             document.getElementById('add').onclick = async () => {
-              const paths = await ipcRenderer.invoke('headless:choose-binary-files');
+              const paths = await ipcRenderer.invoke('${IPC_CHANNELS.chooseBinaryFiles}');
               if (paths && paths.length) {
                 paths.forEach(p => {
                   if (binaries.some(b => b.path === p)) return;
@@ -251,15 +240,15 @@ async function main() {
             };
 
             document.getElementById('create').onclick = () => {
-              ipcRenderer.send('add-binaries-result', binaries.map(b => b.path));
+              ipcRenderer.send('${IPC_CHANNELS.addBinariesResult}', binaries.map(b => b.path));
             };
 
             document.getElementById('cancel').onclick = () => {
-              ipcRenderer.send('add-binaries-result', null);
+              ipcRenderer.send('${IPC_CHANNELS.addBinariesResult}', null);
             };
 
             document.addEventListener('keydown', (e) => {
-              if (e.key === 'Escape') ipcRenderer.send('add-binaries-result', null);
+              if (e.key === 'Escape') ipcRenderer.send('${IPC_CHANNELS.addBinariesResult}', null);
             });
 
             render();
@@ -267,42 +256,45 @@ async function main() {
         </body>
         </html>
       `;
+}
 
-      addBinariesWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(addBinariesHtml));
+function showAddBinariesModal(BrowserWindow, ipcMain) {
+  return new Promise((resolve) => {
+    const addBinariesWindow = new BrowserWindow({
+      width: 520,
+      height: 420,
+      parent: BrowserWindow.getFocusedWindow(),
+      modal: true,
+      show: false,
+      resizable: true,
+      webPreferences: {
+        nodeIntegration: true,
+        contextIsolation: false
+      }
+    });
 
-      addBinariesWindow.once('ready-to-show', () => {
-        addBinariesWindow.show();
-      });
+    addBinariesWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(getAddBinariesModalHtml())}`);
 
-      ipcMain.once('add-binaries-result', (_event, value) => {
-        addBinariesWindow.close();
-        resolve(value);
-      });
+    addBinariesWindow.once("ready-to-show", () => {
+      addBinariesWindow.show();
+    });
 
-      addBinariesWindow.on('closed', () => {
-        try { ipcMain.removeAllListeners('add-binaries-result'); } catch (_) {}
-        resolve(null);
-      });
+    ipcMain.once(IPC_CHANNELS.addBinariesResult, (_event, value) => {
+      addBinariesWindow.close();
+      resolve(value);
+    });
+
+    addBinariesWindow.on("closed", () => {
+      try {
+        ipcMain.removeAllListeners(IPC_CHANNELS.addBinariesResult);
+      } catch (_) {}
+      resolve(null);
     });
   });
+}
 
-  ipcMain.handle("headless:prompt-for-project-name", async () => {
-    // We use a simple prompt window since Electron doesn't have a built-in text prompt dialog
-    return new Promise((resolve) => {
-      const promptWindow = new BrowserWindow({
-        width: 400,
-        height: 180,
-        parent: BrowserWindow.getFocusedWindow(),
-        modal: true,
-        show: false,
-        resizable: false,
-        webPreferences: {
-          nodeIntegration: true,
-          contextIsolation: false
-        }
-      });
-
-      const promptHtml = `
+function getProjectNamePromptHtml() {
+  return `
         <!DOCTYPE html>
         <html>
         <head>
@@ -329,52 +321,55 @@ async function main() {
           <script>
             const { ipcRenderer } = require('electron');
             const input = document.getElementById('name');
-            document.getElementById('ok').onclick = () => ipcRenderer.send('prompt-result', input.value);
-            document.getElementById('cancel').onclick = () => ipcRenderer.send('prompt-result', null);
+            document.getElementById('ok').onclick = () => ipcRenderer.send('${IPC_CHANNELS.promptResult}', input.value);
+            document.getElementById('cancel').onclick = () => ipcRenderer.send('${IPC_CHANNELS.promptResult}', null);
             input.onkeydown = (e) => {
-              if (e.key === 'Enter') ipcRenderer.send('prompt-result', input.value);
-              if (e.key === 'Escape') ipcRenderer.send('prompt-result', null);
+              if (e.key === 'Enter') ipcRenderer.send('${IPC_CHANNELS.promptResult}', input.value);
+              if (e.key === 'Escape') ipcRenderer.send('${IPC_CHANNELS.promptResult}', null);
             };
           </script>
         </body>
         </html>
       `;
+}
 
-      promptWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(promptHtml));
-      
-      promptWindow.once('ready-to-show', () => {
-        promptWindow.show();
-      });
+function promptForProjectName(BrowserWindow, ipcMain) {
+  return new Promise((resolve) => {
+    const promptWindow = new BrowserWindow({
+      width: 400,
+      height: 180,
+      parent: BrowserWindow.getFocusedWindow(),
+      modal: true,
+      show: false,
+      resizable: false,
+      webPreferences: {
+        nodeIntegration: true,
+        contextIsolation: false
+      }
+    });
 
-      ipcMain.once('prompt-result', (event, value) => {
-        promptWindow.close();
-        resolve(value ? value.trim() : null);
-      });
+    promptWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(getProjectNamePromptHtml())}`);
 
-      promptWindow.on('closed', () => {
-        // If closed via X button without submitting
-        resolve(null);
-      });
+    promptWindow.once("ready-to-show", () => {
+      promptWindow.show();
+    });
+
+    ipcMain.once(IPC_CHANNELS.promptResult, (_event, value) => {
+      promptWindow.close();
+      resolve(value ? value.trim() : null);
+    });
+
+    promptWindow.on("closed", () => {
+      try {
+        ipcMain.removeAllListeners(IPC_CHANNELS.promptResult);
+      } catch (_) {}
+      resolve(null);
     });
   });
+}
 
-  ipcMain.handle("headless:prompt-for-rename", async (_event, currentName) => {
-    return new Promise((resolve) => {
-      const defaultValue = typeof currentName === "string" ? currentName : "";
-      const promptWindow = new BrowserWindow({
-        width: 400,
-        height: 180,
-        parent: BrowserWindow.getFocusedWindow(),
-        modal: true,
-        show: false,
-        resizable: false,
-        webPreferences: {
-          nodeIntegration: true,
-          contextIsolation: false
-        }
-      });
-
-      const promptHtml = `
+function getRenamePromptHtml(defaultValue) {
+  return `
         <!DOCTYPE html>
         <html>
         <head>
@@ -393,7 +388,7 @@ async function main() {
         </head>
         <body>
           <h3>Rename Project</h3>
-          <input type="text" id="name" value="${(defaultValue).replace(/"/g, "&quot;")}" autofocus />
+          <input type="text" id="name" value="${defaultValue.replace(/"/g, "&quot;")}" autofocus />
           <div class="buttons">
             <button class="cancel" id="cancel">Cancel</button>
             <button class="ok" id="ok">Rename</button>
@@ -402,58 +397,107 @@ async function main() {
             const { ipcRenderer } = require('electron');
             const input = document.getElementById('name');
             input.select();
-            document.getElementById('ok').onclick = () => ipcRenderer.send('prompt-rename-result', input.value);
-            document.getElementById('cancel').onclick = () => ipcRenderer.send('prompt-rename-result', null);
+            document.getElementById('ok').onclick = () => ipcRenderer.send('${IPC_CHANNELS.promptRenameResult}', input.value);
+            document.getElementById('cancel').onclick = () => ipcRenderer.send('${IPC_CHANNELS.promptRenameResult}', null);
             input.onkeydown = (e) => {
-              if (e.key === 'Enter') ipcRenderer.send('prompt-rename-result', input.value);
-              if (e.key === 'Escape') ipcRenderer.send('prompt-rename-result', null);
+              if (e.key === 'Enter') ipcRenderer.send('${IPC_CHANNELS.promptRenameResult}', input.value);
+              if (e.key === 'Escape') ipcRenderer.send('${IPC_CHANNELS.promptRenameResult}', null);
             };
           </script>
         </body>
         </html>
       `;
+}
 
-      promptWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(promptHtml));
+function promptForRename(BrowserWindow, ipcMain, currentName) {
+  return new Promise((resolve) => {
+    const defaultValue = typeof currentName === "string" ? currentName : "";
+    const promptWindow = new BrowserWindow({
+      width: 400,
+      height: 180,
+      parent: BrowserWindow.getFocusedWindow(),
+      modal: true,
+      show: false,
+      resizable: false,
+      webPreferences: {
+        nodeIntegration: true,
+        contextIsolation: false
+      }
+    });
 
-      promptWindow.once('ready-to-show', () => {
-        promptWindow.show();
-      });
+    promptWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(getRenamePromptHtml(defaultValue))}`);
 
-      ipcMain.once('prompt-rename-result', (_ev, value) => {
-        promptWindow.close();
-        resolve(value ? value.trim() : null);
-      });
+    promptWindow.once("ready-to-show", () => {
+      promptWindow.show();
+    });
 
-      promptWindow.on('closed', () => {
-        try {
-          ipcMain.removeAllListeners('prompt-rename-result');
-        }
-        catch (_) {}
-        resolve(null);
-      });
+    ipcMain.once(IPC_CHANNELS.promptRenameResult, (_event, value) => {
+      promptWindow.close();
+      resolve(value ? value.trim() : null);
+    });
+
+    promptWindow.on("closed", () => {
+      try {
+        ipcMain.removeAllListeners(IPC_CHANNELS.promptRenameResult);
+      } catch (_) {}
+      resolve(null);
     });
   });
+}
 
-  createWindow();
-  app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
-    }
-  });
-  app.on("window-all-closed", () => {
-    if (process.platform !== "darwin") {
-      app.quit();
-    }
-  });
-  app.on("will-quit", () => {
-    ipcMain.removeHandler("headless:choose-create-project-directory");
-    ipcMain.removeHandler("headless:choose-existing-project");
-    ipcMain.removeHandler("headless:choose-binary-files");
-    ipcMain.removeHandler("headless:launch-desktop-project");
-    ipcMain.removeHandler("headless:prompt-for-project-name");
-    ipcMain.removeHandler("headless:prompt-for-rename");
-    ipcMain.removeHandler("headless:show-add-binaries-modal");
-  });
+function registerIpcHandlers(BrowserWindow, dialog, ipcMain, repoRoot) {
+  ipcMain.handle(IPC_CHANNELS.chooseCreateProjectDirectory, () => chooseCreateProjectDirectory(dialog));
+  ipcMain.handle(IPC_CHANNELS.chooseExistingProject, () => chooseExistingProject(dialog));
+  ipcMain.handle(IPC_CHANNELS.chooseBinaryFiles, () => chooseBinaryFiles(dialog));
+  ipcMain.handle(IPC_CHANNELS.launchDesktopProject, (_event, project) => launchDesktopProject(project, repoRoot));
+  ipcMain.handle(IPC_CHANNELS.showAddBinariesModal, () => showAddBinariesModal(BrowserWindow, ipcMain));
+  ipcMain.handle(IPC_CHANNELS.promptForProjectName, () => promptForProjectName(BrowserWindow, ipcMain));
+  ipcMain.handle(IPC_CHANNELS.promptForRename, (_event, currentName) =>
+    promptForRename(BrowserWindow, ipcMain, currentName)
+  );
+}
+
+function handleAppActivate(BrowserWindow) {
+  if (BrowserWindow.getAllWindows().length === 0) {
+    createWindow(BrowserWindow);
+  }
+}
+
+function handleWindowAllClosed(app) {
+  if (process.platform !== "darwin") {
+    app.quit();
+  }
+}
+
+function removeIpcHandlers(ipcMain) {
+  ipcMain.removeHandler(IPC_CHANNELS.chooseCreateProjectDirectory);
+  ipcMain.removeHandler(IPC_CHANNELS.chooseExistingProject);
+  ipcMain.removeHandler(IPC_CHANNELS.chooseBinaryFiles);
+  ipcMain.removeHandler(IPC_CHANNELS.launchDesktopProject);
+  ipcMain.removeHandler(IPC_CHANNELS.promptForProjectName);
+  ipcMain.removeHandler(IPC_CHANNELS.promptForRename);
+  ipcMain.removeHandler(IPC_CHANNELS.showAddBinariesModal);
+}
+
+function wireAppLifecycle(app, BrowserWindow, ipcMain) {
+  app.on("activate", handleAppActivate.bind(null, BrowserWindow));
+  app.on("window-all-closed", handleWindowAllClosed.bind(null, app));
+  app.on("will-quit", removeIpcHandlers.bind(null, ipcMain));
+}
+
+async function main() {
+  const electron = await loadElectronMain();
+  const { app, BrowserWindow, dialog, ipcMain } = electron;
+  if (!app || !BrowserWindow || !dialog || !ipcMain) {
+    throw new Error("Electron main-process APIs are unavailable.");
+  }
+
+  const repoRoot = path.resolve(__dirname, "..");
+
+  await app.whenReady();
+  registerIpcHandlers(BrowserWindow, dialog, ipcMain, repoRoot);
+  wireAppLifecycle(app, BrowserWindow, ipcMain);
+  createWindow(BrowserWindow);
 }
 
 main().catch((error) => {
