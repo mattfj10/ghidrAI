@@ -1,0 +1,66 @@
+body {
+  font-family: Inter, system-ui, sans-serif;
+  background: #0a0a0a;
+  color: #eeeeee;
+  padding: 20px;
+  margin: 0;
+}
+
+h3 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #fff;
+}
+
+input {
+  width: 100%;
+  padding: 8px 12px;
+  margin-bottom: 15px;
+  background: #161616;
+  border: 1px solid #2a2a2a;
+  color: #eeeeee;
+  box-sizing: border-box;
+  outline: none;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+input:focus {
+  border-color: #555;
+}
+
+.buttons {
+  text-align: right;
+}
+
+button {
+  padding: 8px 14px;
+  margin-left: 8px;
+  border: 1px solid #2a2a2a;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 100ms ease, border-color 100ms ease;
+}
+
+button.ok {
+  background: #333333;
+  color: #eeeeee;
+}
+
+button.ok:hover {
+  background: #444444;
+  border-color: #444;
+}
+
+button.cancel {
+  background: transparent;
+  color: #eeeeee;
+}
+
+button.cancel:hover {
+  background: rgba(255, 255, 255, 0.05);
+}

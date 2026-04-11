@@ -42,12 +42,6 @@ async function refreshHealth() {
   }
 }
 
-function formatProjectLocation(project) {
-  const pathParts = project.projectPath.split(/[\\/]/);
-  pathParts.pop();
-  return pathParts.join("/") || project.projectPath;
-}
-
 async function launchRememberedProject(project) {
   if (!project.existsOnDisk) {
     setFormMessage(`Cannot open ${project.name}: project is missing on disk.`, "error");
@@ -108,8 +102,8 @@ function showContextMenu(event, project) {
   menu.style.left = `${left}px`;
   menu.style.top = `${top}px`;
 
-  const closeOnClickOutside = (e) => {
-    if (!menu.contains(e.target)) {
+  const closeOnClickOutside = (nextEvent) => {
+    if (!menu.contains(nextEvent.target)) {
       closeContextMenu();
     }
     document.removeEventListener("click", closeOnClickOutside);
@@ -161,9 +155,9 @@ function createProjectRow(project) {
     row.classList.add("is-missing");
   }
   row.disabled = busyState;
-  
+
   const statusText = project.existsOnDisk ? "Available" : "Missing on disk";
-  
+
   row.innerHTML = `
     <div class="project-info">
       <div class="project-title">${project.name}</div>
@@ -173,7 +167,7 @@ function createProjectRow(project) {
       ${project.projectPath}
     </div>
   `;
-  
+
   row.addEventListener("click", async () => {
     try {
       await launchRememberedProject(project);
@@ -181,7 +175,7 @@ function createProjectRow(project) {
       setFormMessage(error.message, "error");
     }
   });
-  row.addEventListener("contextmenu", (e) => showContextMenu(e, project));
+  row.addEventListener("contextmenu", (event) => showContextMenu(event, project));
   return row;
 }
 
