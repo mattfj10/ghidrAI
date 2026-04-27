@@ -60,6 +60,17 @@ class ProjectStore {
 		return project;
 	}
 
+	synchronized ProjectRecord getActiveProject() {
+		refreshExistsFlags();
+		for (ProjectRecord project : projectsById.values()) {
+			if (project.isActive) {
+				return project;
+			}
+		}
+		throw new ApiException(404, "NO_ACTIVE_PROJECT",
+			"No active project is currently open.");
+	}
+
 	synchronized ProjectRecord createProject(String projectDirectory, String projectName)
 			throws IOException {
 		projectOps.createProject(projectDirectory, projectName);
@@ -226,6 +237,12 @@ class ProjectStore {
 		record.name = newName.trim();
 		save();
 		return record;
+	}
+
+	synchronized String readActiveProjectDisassembly(String binaryName) throws IOException {
+		ProjectRecord active = getActiveProject();
+		return projectOps.readProgramDisassembly(projectDirectory(active), storedProjectName(active),
+			binaryName);
 	}
 
 	private void save() throws IOException {

@@ -42,6 +42,19 @@ class FakeProjectOps implements GhidraProjectOps {
 	public boolean projectExists(String projectDirectory, String projectName) {
 		return Files.isDirectory(Paths.get(projectDirectory, projectName));
 	}
+
+	@Override
+	public String readProgramDisassembly(String projectDirectory, String projectName, String programName)
+			throws IOException {
+		if (!projectExists(projectDirectory, projectName)) {
+			throw new ApiException(404, "PROJECT_NOT_FOUND",
+				"The requested project could not be found.");
+		}
+		if (programName == null || programName.isBlank()) {
+			throw new ApiException(422, "VALIDATION_ERROR", "The request failed validation.");
+		}
+		return "00000000 90 NOP";
+	}
 }
 
 class FakeExecutionEngine implements HeadlessExecutionEngine {

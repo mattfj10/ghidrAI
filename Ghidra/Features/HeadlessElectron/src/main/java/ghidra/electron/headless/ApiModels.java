@@ -183,7 +183,7 @@ class CapabilityResponse {
 	final int maxConcurrency = 1;
 	final List<String> transports = List.of("http-json", "sse");
 	final List<String> projectEndpoints = List.of("list", "create", "open", "get",
-		"import-and-analyze");
+		"import-and-analyze", "active-disassembly");
 	final List<String> jobStates = List.of("queued", "running", "completed", "failed", "cancelled");
 	final List<String> artifactTypes = List.of("log", "report", "export", "other");
 }

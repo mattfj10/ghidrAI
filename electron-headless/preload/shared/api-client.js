@@ -38,7 +38,11 @@ function createBackendApi() {
     renameProject: (projectId, newName) =>
       jsonRequest(`/api/v1/projects/${encodeURIComponent(projectId)}`, "PATCH", {
         name: newName
-      })
+      }),
+    getActiveDisassembly: (binaryName) =>
+      jsonRequest(
+        `/api/v1/projects/active/disassembly?binaryName=${encodeURIComponent(binaryName)}`
+      )
   };
 }
 

@@ -70,10 +70,22 @@ async function launchRememberedProject(project) {
   }
 
   setBusy(true);
-  setFormMessage(`Launching ${project.name} in Ghidra...`, "muted");
+  setFormMessage(`Opening ${project.name} workspace...`, "muted");
   try {
-    await requireApi().launchDesktopProject(project);
-    setFormMessage(`Launched ${project.name} in Ghidra.`, "success");
+    const projectDirectory =
+      typeof project.projectDirectory === "string" && project.projectDirectory
+        ? project.projectDirectory
+        : project.projectPath;
+    const projectName =
+      typeof project.projectName === "string" && project.projectName ? project.projectName : project.name;
+    if (!projectDirectory || !projectName) {
+      throw new Error("Remembered project is missing path details.");
+    }
+    await requireApi().openProject(projectDirectory, projectName);
+    await requireApi().openWorkspace(project);
+    setFormMessage(`Opened ${project.name} workspace.`, "success");
+  } catch (error) {
+    setFormMessage(error.message, "error");
   } finally {
     setBusy(false);
   }

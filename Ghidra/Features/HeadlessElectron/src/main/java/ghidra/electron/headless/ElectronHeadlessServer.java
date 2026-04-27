@@ -17,6 +17,7 @@ package ghidra.electron.headless;
 
 import java.io.*;
 import java.net.InetSocketAddress;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
@@ -48,6 +49,7 @@ public class ElectronHeadlessServer {
 		server.setExecutor(Executors.newCachedThreadPool());
 		server.createContext("/api/v1/health", this::handleHealth);
 		server.createContext("/api/v1/capabilities", this::handleCapabilities);
+		server.createContext("/api/v1/projects/active/disassembly", this::handleActiveDisassembly);
 		server.createContext("/api/v1/projects", this::handleProjects);
 		server.createContext("/api/v1/jobs", this::handleJobs);
 		server.createContext("/api/v1/events", this::handleEvents);
@@ -88,6 +90,33 @@ public class ElectronHeadlessServer {
 	private void handleCapabilities(HttpExchange exchange) throws IOException {
 		String requestId = JsonSupport.requestId(exchange);
 		JsonSupport.writeEnvelope(exchange, 200, requestId, new CapabilityResponse());
+	}
+
+	private void handleActiveDisassembly(HttpExchange exchange) throws IOException {
+		if (!"GET".equals(exchange.getRequestMethod())) {
+			exchange.sendResponseHeaders(405, -1);
+			return;
+		}
+		String requestId = JsonSupport.requestId(exchange);
+		try {
+			String binaryName = queryParam(exchange.getRequestURI().getRawQuery(), "binaryName");
+			if (binaryName == null || binaryName.isBlank()) {
+				throw new ApiException(422, "VALIDATION_ERROR", "The request failed validation.",
+					Map.of("fields", Map.of("binaryName", "Query parameter is required")));
+			}
+			String disassembly = projectStore.readActiveProjectDisassembly(binaryName);
+			ProjectRecord active = projectStore.getActiveProject();
+			JsonSupport.writeEnvelope(exchange, 200, requestId,
+				Map.of("projectId", active.projectId, "binaryName", binaryName, "disassembly",
+					disassembly));
+		}
+		catch (ApiException e) {
+			JsonSupport.writeError(exchange, e.statusCode, requestId, e.error);
+		}
+		catch (Exception e) {
+			JsonSupport.writeError(exchange, 500, requestId,
+				new ApiError("INTERNAL_ERROR", e.getMessage(), null));
+		}
 	}
 
 	private void handleProjects(HttpExchange exchange) throws IOException {
@@ -310,6 +339,19 @@ public class ElectronHeadlessServer {
 			}
 		}
 		return 0;
+	}
+
+	private String queryParam(String rawQuery, String key) {
+		if (rawQuery == null || rawQuery.isBlank()) {
+			return null;
+		}
+		for (String pair : rawQuery.split("&")) {
+			String[] parts = pair.split("=", 2);
+			if (parts.length == 2 && key.equals(parts[0])) {
+				return URLDecoder.decode(parts[1], StandardCharsets.UTF_8);
+			}
+		}
+		return null;
 	}
 
 	private Object sanitize(List<ArtifactRecord> records) {
