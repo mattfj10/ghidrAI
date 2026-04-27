@@ -72,7 +72,16 @@ async function launchRememberedProject(project) {
   setBusy(true);
   setFormMessage(`Opening ${project.name} workspace...`, "muted");
   try {
-    // We now open the new workspace UI instead of desktop Ghidra
+    const projectDirectory =
+      typeof project.projectDirectory === "string" && project.projectDirectory
+        ? project.projectDirectory
+        : project.projectPath;
+    const projectName =
+      typeof project.projectName === "string" && project.projectName ? project.projectName : project.name;
+    if (!projectDirectory || !projectName) {
+      throw new Error("Remembered project is missing path details.");
+    }
+    await requireApi().openProject(projectDirectory, projectName);
     await requireApi().openWorkspace(project);
     setFormMessage(`Opened ${project.name} workspace.`, "success");
   } catch (error) {

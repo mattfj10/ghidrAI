@@ -93,14 +93,6 @@ public class ElectronHeadlessServer {
 	}
 
 	private void handleActiveDisassembly(HttpExchange exchange) throws IOException {
-		// #region agent log
-		try {
-			String p = exchange.getRequestURI().getPath();
-			Files.writeString(Paths.get("/home/tornado711/.cursor/debug-a7d37d.log"),
-				"{\"sessionId\":\"a7d37d\",\"runId\":\"backend\",\"hypothesisId\":\"H9\",\"location\":\"ElectronHeadlessServer.handleActiveDisassembly\",\"message\":\"disassembly handler hit\",\"data\":{\"path\":\"" + p + "\"},\"timestamp\":" + System.currentTimeMillis() + "}\n",
-				StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
-		} catch (Exception ignored) {}
-		// #endregion
 		if (!"GET".equals(exchange.getRequestMethod())) {
 			exchange.sendResponseHeaders(405, -1);
 			return;
@@ -132,15 +124,6 @@ public class ElectronHeadlessServer {
 		try {
 			String path = exchange.getRequestURI().getPath();
 			String method = exchange.getRequestMethod();
-			// #region agent log
-			if (path != null && path.contains("disassembly")) {
-				try {
-					Files.writeString(Paths.get("/home/tornado711/.cursor/debug-a7d37d.log"),
-						"{\"sessionId\":\"a7d37d\",\"runId\":\"backend\",\"hypothesisId\":\"H10\",\"location\":\"ElectronHeadlessServer.handleProjects\",\"message\":\"disassembly request hit projects handler\",\"data\":{\"path\":\"" + path + "\",\"method\":\"" + method + "\"},\"timestamp\":" + System.currentTimeMillis() + "}\n",
-						StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
-				} catch (Exception ignored) {}
-			}
-			// #endregion
 			if ("/api/v1/projects".equals(path)) {
 				if ("DELETE".equals(method)) {
 					try {

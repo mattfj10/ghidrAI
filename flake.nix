@@ -143,6 +143,7 @@
             curl
             electron
             coreutils
+            procps
           ];
           text = ''
             set -euo pipefail
@@ -186,6 +187,23 @@
             }
             trap cleanup EXIT INT TERM
 
+            # Ensure stale backend instances are stopped before launching a new one.
+            stale_pids="$(pgrep -f "ghidra\\.electron\\.headless\\.ElectronHeadlessLaunchable.*''${GHIDRA_ELECTRON_PORT}" || true)"
+            if [ -n "$stale_pids" ]; then
+              echo "Stopping stale headless backend process(es): $stale_pids"
+              while IFS= read -r stale_pid; do
+                if [ -n "$stale_pid" ]; then
+                  kill "$stale_pid" >/dev/null 2>&1 || true
+                fi
+              done <<< "$stale_pids"
+              for _ in $(seq 1 40); do
+                if ! pgrep -f "ghidra\\.electron\\.headless\\.ElectronHeadlessLaunchable.*''${GHIDRA_ELECTRON_PORT}" >/dev/null 2>&1; then
+                  break
+                fi
+                sleep 0.25
+              done
+            fi
+
             echo "Starting headless backend on $GHIDRA_BACKEND_URL..."
             "$repo/Ghidra/RuntimeScripts/Linux/support/launch.sh" \
               fg jdk Ghidra-Electron-Headless 2G "-Djava.awt.headless=true" \
@@ -198,6 +216,10 @@
             ready=0
             echo "Waiting for Ghidra to initialize (this may take 60-90 seconds on first run)..."
             for _ in $(seq 1 480); do
+              if ! kill -0 "$backend_pid" >/dev/null 2>&1; then
+                echo "Backend process exited before becoming healthy. Check logs for startup errors." >&2
+                exit 1
+              fi
               if curl -fsS "$GHIDRA_BACKEND_URL/api/v1/health" >/dev/null; then
                 ready=1
                 break
