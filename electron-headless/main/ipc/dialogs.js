@@ -15,7 +15,7 @@ async function chooseCreateProjectDirectory(dialog) {
 async function chooseExistingProject(dialog) {
   const result = await dialog.showOpenDialog({
     title: "Open Ghidra Project",
-    properties: ["openFile", "openDirectory"],
+    properties: ["openFile"],
     filters: [{ name: "Ghidra Projects", extensions: ["gpr", "rep"] }]
   });
   if (result.canceled || !result.filePaths.length) {

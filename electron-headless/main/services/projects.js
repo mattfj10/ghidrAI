@@ -1,4 +1,3 @@
-const fs = require("node:fs");
 const path = require("node:path");
 
 function normalizeProjectSelection(selectedPath) {
@@ -17,28 +16,7 @@ function normalizeProjectSelection(selectedPath) {
       projectName: basename.slice(0, -".rep".length)
     };
   }
-  if (fs.existsSync(selectedPath) && fs.lstatSync(selectedPath).isDirectory()) {
-    const entries = fs.readdirSync(selectedPath);
-    const projectNames = entries
-      .filter((entry) => entry.endsWith(".gpr"))
-      .map((entry) => entry.slice(0, -".gpr".length))
-      .filter((name) => entries.includes(`${name}.rep`));
-    if (projectNames.length === 1) {
-      return {
-        selectedPath,
-        projectDirectory: selectedPath,
-        projectName: projectNames[0]
-      };
-    }
-    if (projectNames.length > 1) {
-      throw new Error(
-        "The selected folder contains multiple Ghidra projects. Select a specific .gpr file or .rep directory."
-      );
-    }
-  }
-  throw new Error(
-    "Select a Ghidra project file (.gpr), project directory (.rep), or a folder containing exactly one project."
-  );
+  throw new Error("Select a Ghidra project file (.gpr or .rep).");
 }
 
 function toProjectFilePath(project) {
