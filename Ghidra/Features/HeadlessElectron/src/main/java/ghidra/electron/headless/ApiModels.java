@@ -65,18 +65,22 @@ class ApiException extends RuntimeException {
 class ProjectRecord {
 	String projectId;
 	String name;
+	String projectDirectory;
+	String projectName;
 	String projectPath;
 	String lastOpenedAt;
 	String createdAt;
 	boolean existsOnDisk;
 	boolean isActive;
 
-	static ProjectRecord create(String projectId, String name, String projectPath, boolean existsOnDisk,
-			boolean isActive) {
+	static ProjectRecord create(String projectId, String name, String projectDirectory,
+			String projectName, boolean existsOnDisk, boolean isActive) {
 		ProjectRecord record = new ProjectRecord();
 		record.projectId = projectId;
 		record.name = name;
-		record.projectPath = projectPath;
+		record.projectDirectory = projectDirectory;
+		record.projectName = projectName;
+		record.projectPath = null;
 		record.createdAt = Instant.now().toString();
 		record.lastOpenedAt = null;
 		record.existsOnDisk = existsOnDisk;

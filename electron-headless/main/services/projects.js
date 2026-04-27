@@ -6,14 +6,14 @@ function normalizeProjectSelection(selectedPath) {
   if (basename.endsWith(".gpr")) {
     return {
       selectedPath,
-      projectPath: path.dirname(selectedPath),
+      projectDirectory: path.dirname(selectedPath),
       projectName: basename.slice(0, -".gpr".length)
     };
   }
   if (basename.endsWith(".rep")) {
     return {
       selectedPath,
-      projectPath: path.dirname(selectedPath),
+      projectDirectory: path.dirname(selectedPath),
       projectName: basename.slice(0, -".rep".length)
     };
   }
@@ -26,7 +26,7 @@ function normalizeProjectSelection(selectedPath) {
     if (projectNames.length === 1) {
       return {
         selectedPath,
-        projectPath: selectedPath,
+        projectDirectory: selectedPath,
         projectName: projectNames[0]
       };
     }
@@ -42,13 +42,44 @@ function normalizeProjectSelection(selectedPath) {
 }
 
 function toProjectFilePath(project) {
-  if (!project || typeof project.projectPath !== "string" || !project.projectPath.trim()) {
-    throw new Error("Missing remembered project path.");
+  if (!project) {
+    throw new Error("Missing remembered project.");
   }
-  const normalizedProjectPath = project.projectPath.endsWith(".gpr")
-    ? project.projectPath
-    : `${project.projectPath}.gpr`;
-  return path.resolve(normalizedProjectPath);
+
+  let projectDirectory = null;
+  if (typeof project.projectDirectory === "string" && project.projectDirectory.trim()) {
+    projectDirectory = project.projectDirectory.trim();
+  }
+
+  let projectName = null;
+  if (typeof project.projectName === "string" && project.projectName.trim()) {
+    projectName = project.projectName.trim();
+  } else if (typeof project.name === "string" && project.name.trim()) {
+    projectName = project.name.trim();
+  }
+
+  if (
+    !projectDirectory &&
+    typeof project.projectPath === "string" &&
+    project.projectPath.trim()
+  ) {
+    const legacyProjectPath = path.resolve(project.projectPath.trim());
+    projectDirectory = path.dirname(legacyProjectPath);
+    if (!projectName) {
+      const basename = path.basename(legacyProjectPath, path.extname(legacyProjectPath));
+      projectName = basename;
+    }
+  }
+
+  if (!projectDirectory) {
+    throw new Error("Missing remembered project directory.");
+  }
+
+  if (!projectName) {
+    throw new Error("Missing remembered project name.");
+  }
+
+  return path.resolve(path.join(projectDirectory, `${projectName}.gpr`));
 }
 
 module.exports = {

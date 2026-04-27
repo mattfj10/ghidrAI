@@ -119,9 +119,8 @@ class ScriptProcessExecutionEngine implements HeadlessExecutionEngine {
 
 	private List<String> buildCommand(ProjectRecord project, ImportAnalyzeRequest request, Path appLog,
 			Path scriptLog) {
-		Path projectPath = Paths.get(project.projectPath);
-		String projectDir = Optional.ofNullable(projectPath.getParent()).orElse(projectPath).toString();
-		String projectName = projectPath.getFileName().toString();
+		String projectDir = project.projectDirectory;
+		String projectName = project.projectName;
 		Path analyzeHeadless = repoRoot.resolve("Ghidra/RuntimeScripts/Linux/support/analyzeHeadless");
 
 		List<String> command = new ArrayList<>();

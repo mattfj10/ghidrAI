@@ -26,12 +26,12 @@ function createBackendApi() {
     baseUrl,
     health: () => jsonRequest("/api/v1/health"),
     listProjects: () => jsonRequest("/api/v1/projects"),
-    createProject: (projectPath, projectName) =>
-      jsonRequest("/api/v1/projects", "POST", { projectPath, projectName }),
+    createProject: (projectDirectory, projectName) =>
+      jsonRequest("/api/v1/projects", "POST", { projectPath: projectDirectory, projectName }),
     importAndAnalyze: (projectId, inputPaths) =>
       jsonRequest(`/api/v1/projects/${projectId}/import-and-analyze`, "POST", { inputPaths }),
-    openProject: (projectPath, projectName) =>
-      jsonRequest("/api/v1/projects/open", "POST", { projectPath, projectName }),
+    openProject: (projectDirectory, projectName) =>
+      jsonRequest("/api/v1/projects/open", "POST", { projectPath: projectDirectory, projectName }),
     clearProjects: () => jsonRequest("/api/v1/projects", "DELETE"),
     deleteProject: (projectId) =>
       jsonRequest(`/api/v1/projects/${encodeURIComponent(projectId)}`, "DELETE"),

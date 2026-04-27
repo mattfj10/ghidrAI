@@ -139,7 +139,8 @@ class HeadlessJobManager {
 				job.result.importedPrograms = 1;
 				job.result.analyzedPrograms = Boolean.TRUE.equals(job.request.noAnalysis) ? 0 : 1;
 				job.result.failedPrograms = 0;
-				job.result.outputProjectPath = project.projectPath;
+				job.result.outputProjectPath =
+					Paths.get(project.projectDirectory, project.projectName).toString();
 				artifactStore.writeSummaryArtifact(job.jobId, job.result);
 				registerArtifactIds(job.jobId);
 				eventBroker.publish("job.completed",
