@@ -33,6 +33,27 @@ function setBusy(nextBusyState) {
   }
 }
 
+function formatProjectPath(project) {
+  let projectDirectory = "";
+  if (typeof project.projectDirectory === "string" && project.projectDirectory) {
+    projectDirectory = project.projectDirectory;
+  } else if (typeof project.projectPath === "string") {
+    projectDirectory = project.projectPath;
+  }
+
+  let projectName = "";
+  if (typeof project.projectName === "string" && project.projectName) {
+    projectName = project.projectName;
+  } else if (typeof project.name === "string") {
+    projectName = project.name;
+  }
+
+  if (!projectDirectory) {
+    return projectName;
+  }
+  return `${projectDirectory}/${projectName}`;
+}
+
 async function refreshHealth() {
   try {
     const health = await requireApi().health();
@@ -40,12 +61,6 @@ async function refreshHealth() {
   } catch (error) {
     setHealth(`Backend offline: ${error.message}`, false);
   }
-}
-
-function formatProjectLocation(project) {
-  const pathParts = project.projectPath.split(/[\\/]/);
-  pathParts.pop();
-  return pathParts.join("/") || project.projectPath;
 }
 
 async function launchRememberedProject(project) {
@@ -108,8 +123,8 @@ function showContextMenu(event, project) {
   menu.style.left = `${left}px`;
   menu.style.top = `${top}px`;
 
-  const closeOnClickOutside = (e) => {
-    if (!menu.contains(e.target)) {
+  const closeOnClickOutside = (nextEvent) => {
+    if (!menu.contains(nextEvent.target)) {
       closeContextMenu();
     }
     document.removeEventListener("click", closeOnClickOutside);
@@ -161,19 +176,20 @@ function createProjectRow(project) {
     row.classList.add("is-missing");
   }
   row.disabled = busyState;
-  
+
   const statusText = project.existsOnDisk ? "Available" : "Missing on disk";
-  
+  const projectPath = formatProjectPath(project);
+
   row.innerHTML = `
     <div class="project-info">
       <div class="project-title">${project.name}</div>
       <div class="project-status">${statusText}</div>
     </div>
-    <div class="project-path" title="${project.projectPath}">
-      ${project.projectPath}
+    <div class="project-path" title="${projectPath}">
+      ${projectPath}
     </div>
   `;
-  
+
   row.addEventListener("click", async () => {
     try {
       await launchRememberedProject(project);
@@ -181,7 +197,7 @@ function createProjectRow(project) {
       setFormMessage(error.message, "error");
     }
   });
-  row.addEventListener("contextmenu", (e) => showContextMenu(e, project));
+  row.addEventListener("contextmenu", (event) => showContextMenu(event, project));
   return row;
 }
 
@@ -207,8 +223,8 @@ async function refreshProjects() {
 }
 
 async function createProject() {
-  const projectPath = await requireApi().chooseCreateProjectDirectory();
-  if (!projectPath) {
+  const projectDirectory = await requireApi().chooseCreateProjectDirectory();
+  if (!projectDirectory) {
     setFormMessage("Project creation cancelled.", "muted");
     return;
   }
@@ -234,7 +250,7 @@ async function createProject() {
     );
   }, 5000);
   try {
-    const response = await requireApi().createProject(projectPath, projectName);
+    const response = await requireApi().createProject(projectDirectory, projectName);
     const project = response.data.project;
     if (binaryPaths && binaryPaths.length > 0) {
       setFormMessage("Importing binaries...", "muted");
@@ -245,7 +261,7 @@ async function createProject() {
       );
     } else {
       setFormMessage(
-        `Created ${project.name} at ${project.projectPath}.`,
+        `Created ${project.name} at ${formatProjectPath(project)}.`,
         "success"
       );
     }
@@ -267,12 +283,12 @@ async function openProject() {
   setFormMessage("Opening project...", "muted");
   try {
     const response = await requireApi().openProject(
-      selectedProject.projectPath,
+      selectedProject.projectDirectory,
       selectedProject.projectName
     );
     await refreshProjects();
     setFormMessage(
-      `Opened ${response.data.project.name} from ${response.data.project.projectPath}.`,
+      `Opened ${response.data.project.name} from ${formatProjectPath(response.data.project)}.`,
       "success"
     );
   } finally {

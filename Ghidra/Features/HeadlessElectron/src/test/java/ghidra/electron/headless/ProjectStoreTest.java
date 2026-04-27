@@ -52,7 +52,8 @@ public class ProjectStoreTest extends AbstractGenericTest {
 		assertEquals(1, reloadedStore.listProjects().size());
 		ProjectRecord remembered = reloadedStore.getProject(created.projectId);
 		assertEquals("persisted-project", remembered.name);
-		assertEquals(created.projectPath, remembered.projectPath);
+		assertEquals(created.projectDirectory, remembered.projectDirectory);
+		assertEquals(created.projectName, remembered.projectName);
 	}
 
 	@Test
@@ -77,7 +78,9 @@ public class ProjectStoreTest extends AbstractGenericTest {
 
 		ProjectStore store = new ProjectStore(tempDir, new FakeProjectOps(), broker);
 		ProjectRecord remembered = store.getProject("proj_legacy");
-		assertEquals(tempDir.resolve("legacy-project").toString(), remembered.projectPath);
+		assertEquals(tempDir.toString(), remembered.projectDirectory);
+		assertEquals("legacy-project", remembered.projectName);
+		assertNull(remembered.projectPath);
 		assertTrue(remembered.existsOnDisk);
 	}
 }
