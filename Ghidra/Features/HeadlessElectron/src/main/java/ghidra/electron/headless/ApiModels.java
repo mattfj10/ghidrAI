@@ -199,3 +199,58 @@ class ServerEvent {
 		this.payload = payload;
 	}
 }
+
+class ActiveDisassemblyResponse {
+	final String projectId;
+	final String binaryName;
+	final String disassembly;
+	final List<DisassemblyLine> lines;
+
+	ActiveDisassemblyResponse(String projectId, String binaryName, String disassembly,
+			List<DisassemblyLine> lines) {
+		this.projectId = projectId;
+		this.binaryName = binaryName;
+		this.disassembly = disassembly;
+		this.lines = lines;
+	}
+}
+
+class DisassemblyData {
+	final String disassembly;
+	final List<DisassemblyLine> lines;
+
+	DisassemblyData(String disassembly, List<DisassemblyLine> lines) {
+		this.disassembly = disassembly;
+		this.lines = lines;
+	}
+}
+
+class DisassemblyLine {
+	final String address;
+	final String bytes;
+	final String instruction;
+	final List<InlineComment> inlineComments;
+
+	DisassemblyLine(String address, String bytes, String instruction, List<InlineComment> inlineComments) {
+		this.address = address;
+		this.bytes = bytes;
+		this.instruction = instruction;
+		this.inlineComments = inlineComments;
+	}
+}
+
+class InlineComment {
+	final String kind;
+	final String text;
+	final String sourceAddress;
+
+	InlineComment(String kind, String text) {
+		this(kind, text, null);
+	}
+
+	InlineComment(String kind, String text, String sourceAddress) {
+		this.kind = kind;
+		this.text = text;
+		this.sourceAddress = sourceAddress;
+	}
+}

@@ -104,11 +104,10 @@ public class ElectronHeadlessServer {
 				throw new ApiException(422, "VALIDATION_ERROR", "The request failed validation.",
 					Map.of("fields", Map.of("binaryName", "Query parameter is required")));
 			}
-			String disassembly = projectStore.readActiveProjectDisassembly(binaryName);
+			DisassemblyData disassemblyData = projectStore.readActiveProjectDisassembly(binaryName);
 			ProjectRecord active = projectStore.getActiveProject();
-			JsonSupport.writeEnvelope(exchange, 200, requestId,
-				Map.of("projectId", active.projectId, "binaryName", binaryName, "disassembly",
-					disassembly));
+			JsonSupport.writeEnvelope(exchange, 200, requestId, new ActiveDisassemblyResponse(
+				active.projectId, binaryName, disassemblyData.disassembly, disassemblyData.lines));
 		}
 		catch (ApiException e) {
 			JsonSupport.writeError(exchange, e.statusCode, requestId, e.error);

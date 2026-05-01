@@ -239,7 +239,7 @@ class ProjectStore {
 		return record;
 	}
 
-	synchronized String readActiveProjectDisassembly(String binaryName) throws IOException {
+	synchronized DisassemblyData readActiveProjectDisassembly(String binaryName) throws IOException {
 		ProjectRecord active = getActiveProject();
 		return projectOps.readProgramDisassembly(projectDirectory(active), storedProjectName(active),
 			binaryName);
