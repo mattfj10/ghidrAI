@@ -17,11 +17,19 @@ package ghidra.electron.headless;
 
 import java.io.IOException;
 import java.nio.file.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 
+import ghidra.app.util.EolComments;
+import ghidra.app.util.RefRepeatComment;
+import ghidra.app.util.viewer.field.EolEnablement;
+import ghidra.app.util.viewer.field.EolExtraCommentsOption;
 import ghidra.GhidraApplicationLayout;
 import ghidra.GhidraJarApplicationLayout;
 import ghidra.framework.*;
+import ghidra.framework.model.DomainObject;
 import ghidra.framework.model.DomainFile;
 import ghidra.framework.model.DomainFolder;
 import ghidra.framework.model.Project;
@@ -48,7 +56,8 @@ interface GhidraProjectOps {
 
 	boolean projectExists(String projectDirectory, String projectName);
 
-	String readProgramDisassembly(String projectDirectory, String projectName, String programName)
+	DisassemblyData readProgramDisassembly(String projectDirectory, String projectName,
+			String programName)
 			throws IOException;
 }
 
@@ -92,22 +101,8 @@ class DefaultGhidraProjectOps implements GhidraProjectOps {
 			throw new ApiException(404, "PROJECT_NOT_FOUND", "The requested project could not be found.",
 				Map.of("projectPath", locator.getProjectDir().getAbsolutePath()));
 		}
-		ServiceProjectManager pm = new ServiceProjectManager();
-		try {
-			Project project = pm.openProject(locator, false, false);
-			project.close();
-		}
-		catch (NotFoundException e) {
-			throw new ApiException(404, "PROJECT_NOT_FOUND",
-				"The requested project could not be found.",
-				Map.of("projectPath", locator.getProjectDir().getAbsolutePath()));
-		}
-		catch (NotOwnerException | LockException e) {
-			throw new ApiException(409, "PROJECT_NOT_FOUND",
-				"The requested project could not be opened.",
-				Map.of("projectPath", locator.getProjectDir().getAbsolutePath(), "reason",
-					e.getMessage()));
-		}
+		Project project = openProject(locator);
+		project.close();
 	}
 
 	@Override
@@ -116,7 +111,8 @@ class DefaultGhidraProjectOps implements GhidraProjectOps {
 	}
 
 	@Override
-	public String readProgramDisassembly(String projectDirectory, String projectName, String programName)
+	public DisassemblyData readProgramDisassembly(String projectDirectory, String projectName,
+			String programName)
 			throws IOException {
 		ensureInitialized();
 		if (programName == null || programName.isBlank()) {
@@ -125,22 +121,7 @@ class DefaultGhidraProjectOps implements GhidraProjectOps {
 		}
 
 		ProjectLocator locator = new ProjectLocator(projectDirectory, projectName);
-		ServiceProjectManager pm = new ServiceProjectManager();
-		Project project;
-		try {
-			project = pm.openProject(locator, false, false);
-		}
-		catch (NotFoundException e) {
-			throw new ApiException(404, "PROJECT_NOT_FOUND",
-				"The requested project could not be found.",
-				Map.of("projectPath", locator.getProjectDir().getAbsolutePath()));
-		}
-		catch (NotOwnerException | LockException e) {
-			throw new ApiException(409, "PROJECT_NOT_FOUND",
-				"The requested project could not be opened.",
-				Map.of("projectPath", locator.getProjectDir().getAbsolutePath(), "reason",
-					e.getMessage()));
-		}
+		Project project = openProject(locator);
 
 		Object consumer = new Object();
 		try {
@@ -152,17 +133,17 @@ class DefaultGhidraProjectOps implements GhidraProjectOps {
 			}
 
 			try {
-				Object domainObject = file.getDomainObject(consumer, true, false, TaskMonitor.DUMMY);
-				if (!(domainObject instanceof Program program)) {
-					throw new ApiException(422, "UNSUPPORTED_BINARY",
-						"The selected file is not a program and cannot be disassembled.",
-						Map.of("binaryName", programName));
-				}
+				DomainObject domainObject = file.getDomainObject(consumer, true, false, TaskMonitor.DUMMY);
 				try {
+					if (!(domainObject instanceof Program program)) {
+						throw new ApiException(422, "UNSUPPORTED_BINARY",
+							"The selected file is not a program and cannot be disassembled.",
+							Map.of("binaryName", programName));
+					}
 					return formatDisassembly(program);
 				}
 				finally {
-					program.release(consumer);
+					domainObject.release(consumer);
 				}
 			}
 			catch (VersionException e) {
@@ -181,17 +162,44 @@ class DefaultGhidraProjectOps implements GhidraProjectOps {
 		}
 	}
 
+	private Project openProject(ProjectLocator locator) throws IOException {
+		ServiceProjectManager pm = new ServiceProjectManager();
+		try {
+			return pm.openProject(locator, false, false);
+		}
+		catch (NotFoundException e) {
+			throw new ApiException(404, "PROJECT_NOT_FOUND",
+				"The requested project could not be found.",
+				Map.of("projectPath", locator.getProjectDir().getAbsolutePath()));
+		}
+		catch (NotOwnerException | LockException e) {
+			throw new ApiException(409, "PROJECT_NOT_FOUND",
+				"The requested project could not be opened.",
+				Map.of("projectPath", locator.getProjectDir().getAbsolutePath(), "reason",
+					e.getMessage()));
+		}
+	}
+
 	private DomainFile findProgramFile(DomainFolder folder, String programName) {
+		DomainFile exactMatch = findProgramFile(folder, programName, false);
+		if (exactMatch != null) {
+			return exactMatch;
+		}
+		return findProgramFile(folder, programName, true);
+	}
+
+	private DomainFile findProgramFile(DomainFolder folder, String programName, boolean ignoreCase) {
 		for (DomainFile file : folder.getFiles()) {
 			if (!ProgramContentHandler.PROGRAM_CONTENT_TYPE.equals(file.getContentType())) {
 				continue;
 			}
-			if (file.getName().equals(programName) || file.getName().equalsIgnoreCase(programName)) {
+			if (ignoreCase ? file.getName().equalsIgnoreCase(programName)
+					: file.getName().equals(programName)) {
 				return file;
 			}
 		}
 		for (DomainFolder child : folder.getFolders()) {
-			DomainFile found = findProgramFile(child, programName);
+			DomainFile found = findProgramFile(child, programName, ignoreCase);
 			if (found != null) {
 				return found;
 			}
@@ -199,8 +207,9 @@ class DefaultGhidraProjectOps implements GhidraProjectOps {
 		return null;
 	}
 
-	private String formatDisassembly(Program program) {
+	private DisassemblyData formatDisassembly(Program program) {
 		StringBuilder out = new StringBuilder();
+		List<DisassemblyLine> lines = new ArrayList<>();
 		out.append("; Program: ").append(program.getName()).append(System.lineSeparator());
 		out.append("; Address").append("            ").append("Bytes")
 			.append("                    ").append("Instruction")
@@ -218,13 +227,52 @@ class DefaultGhidraProjectOps implements GhidraProjectOps {
 			catch (MemoryAccessException e) {
 				bytes = "<unavailable>";
 			}
-			out.append(String.format("%-18s %-24s %s%n", address, bytes, instruction.toString()));
+			String instructionText = instruction.toString();
+			out.append(String.format("%-18s %-24s %s%n", address, bytes, instructionText));
+			lines.add(new DisassemblyLine(address, bytes, instructionText,
+				extractInlineComments(instruction)));
 			count++;
 		}
 		if (count == 0) {
 			out.append("; No instructions found in this program.").append(System.lineSeparator());
 		}
-		return out.toString();
+		return new DisassemblyData(out.toString(), lines);
+	}
+
+	private List<InlineComment> extractInlineComments(Instruction instruction) {
+		List<InlineComment> comments = new ArrayList<>();
+		EolComments eolComments = new EolComments(instruction, true, Integer.MAX_VALUE,
+			createEolOptions());
+
+		addCommentLines(comments, "EOL", eolComments.getEOLComments(), null);
+		addCommentLines(comments, "REPEATABLE", eolComments.getRepeatableComments(), null);
+		for (RefRepeatComment refComment : eolComments.getReferencedRepeatableComments()) {
+			String sourceAddress = refComment.getAddress() != null ? refComment.getAddress().toString() : null;
+			addCommentLines(comments, "REFERENCED_REPEATABLE",
+				Arrays.asList(refComment.getCommentLines()), sourceAddress);
+		}
+		addCommentLines(comments, "AUTOMATIC", eolComments.getAutomaticComment(), null);
+		addCommentLines(comments, "OFFCUT", eolComments.getOffcutEolComments(), null);
+		return comments;
+	}
+
+	private void addCommentLines(List<InlineComment> out, String kind, List<String> lines,
+			String sourceAddress) {
+		for (String line : lines) {
+			if (line == null || line.isBlank()) {
+				continue;
+			}
+			out.add(new InlineComment(kind, line, sourceAddress));
+		}
+	}
+
+	private EolExtraCommentsOption createEolOptions() {
+		EolExtraCommentsOption options = new EolExtraCommentsOption();
+		options.setRepeatable(EolEnablement.ALWAYS);
+		options.setRefRepeatable(EolEnablement.ALWAYS);
+		options.setAutoData(EolEnablement.ALWAYS);
+		options.setAutoFunction(EolEnablement.ALWAYS);
+		return options;
 	}
 
 	private String toHex(byte[] bytes) {

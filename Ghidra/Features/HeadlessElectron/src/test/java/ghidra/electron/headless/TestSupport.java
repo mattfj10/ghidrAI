@@ -44,7 +44,8 @@ class FakeProjectOps implements GhidraProjectOps {
 	}
 
 	@Override
-	public String readProgramDisassembly(String projectDirectory, String projectName, String programName)
+	public DisassemblyData readProgramDisassembly(String projectDirectory, String projectName,
+			String programName)
 			throws IOException {
 		if (!projectExists(projectDirectory, projectName)) {
 			throw new ApiException(404, "PROJECT_NOT_FOUND",
@@ -53,7 +54,8 @@ class FakeProjectOps implements GhidraProjectOps {
 		if (programName == null || programName.isBlank()) {
 			throw new ApiException(422, "VALIDATION_ERROR", "The request failed validation.");
 		}
-		return "00000000 90 NOP";
+		return new DisassemblyData("00000000 90 NOP",
+			List.of(new DisassemblyLine("00000000", "90", "NOP", List.of())));
 	}
 }
 
