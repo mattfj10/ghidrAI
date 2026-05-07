@@ -22,6 +22,13 @@ import ghidra.GhidraLaunchable;
 
 public class ElectronHeadlessLaunchable implements GhidraLaunchable {
 
+	/**
+	 * Starts the headless Electron backend from Ghidra's launch framework.
+	 *
+	 * @param layout Ghidra application layout supplied by the launcher
+	 * @param args optional {@code port}, {@code dataDir}, and {@code repoRoot} overrides
+	 * @throws Exception if configuration parsing or server startup fails
+	 */
 	@Override
 	public void launch(GhidraApplicationLayout layout, String[] args) throws Exception {
 		Config config = Config.fromArgs(args);
@@ -43,6 +50,13 @@ public class ElectronHeadlessLaunchable implements GhidraLaunchable {
 	}
 
 	private record Config(int port, Path dataDir, Path repoRoot) {
+		/**
+		 * Builds launch configuration from positional arguments, environment variables, and
+		 * defaults, in that order.
+		 *
+		 * @param args launch arguments supplied by Ghidra
+		 * @return resolved server configuration
+		 */
 		static Config fromArgs(String[] args) {
 			String portValue = valueAt(args, 0, "GHIDRA_ELECTRON_PORT", "8089");
 			String dataDirValue =
@@ -52,6 +66,16 @@ public class ElectronHeadlessLaunchable implements GhidraLaunchable {
 				Path.of(repoRootValue).toAbsolutePath());
 		}
 
+		/**
+		 * Resolves a single configuration value from an argument, environment variable, or
+		 * fallback.
+		 *
+		 * @param args complete launch argument array
+		 * @param index positional argument index to inspect
+		 * @param envName environment variable name to inspect
+		 * @param fallback value used when neither source is set
+		 * @return resolved non-blank value
+		 */
 		private static String valueAt(String[] args, int index, String envName, String fallback) {
 			if (args != null && args.length > index && args[index] != null &&
 				!args[index].isBlank()) {

@@ -28,18 +28,43 @@ class ArtifactStore {
 	private final EventBroker eventBroker;
 	private final Map<String, List<ArtifactRecord>> artifactsByJob = new HashMap<>();
 
+	/**
+	 * Creates an artifact store rooted under the backend data directory.
+	 *
+	 * @param dataDir backend data directory
+	 * @param eventBroker broker used to publish artifact creation events
+	 * @throws IOException if the jobs directory cannot be created
+	 */
 	ArtifactStore(Path dataDir, EventBroker eventBroker) throws IOException {
 		this.jobsRoot = dataDir.resolve("jobs");
 		this.eventBroker = eventBroker;
 		Files.createDirectories(jobsRoot);
 	}
 
+	/**
+	 * Ensures that the working directory and artifact subdirectory exist for a job.
+	 *
+	 * @param jobId job identifier
+	 * @return path to the job working directory
+	 * @throws IOException if the directory cannot be created
+	 */
 	synchronized Path ensureJobDir(String jobId) throws IOException {
 		Path jobDir = jobsRoot.resolve(jobId);
 		Files.createDirectories(jobDir.resolve("artifacts"));
 		return jobDir;
 	}
 
+	/**
+	 * Records an artifact file in memory and on disk, then publishes an event for the UI.
+	 *
+	 * @param jobId job that produced the artifact
+	 * @param file artifact file path
+	 * @param type API artifact category such as {@code log} or {@code report}
+	 * @param contentType MIME type used when serving the artifact
+	 * @param inline whether the file is intended for inline display by callers
+	 * @return registered artifact metadata
+	 * @throws IOException if file metadata cannot be read or persisted
+	 */
 	synchronized ArtifactRecord registerArtifact(String jobId, Path file, String type,
 			String contentType, boolean inline) throws IOException {
 		ensureJobDir(jobId);
@@ -60,6 +85,13 @@ class ArtifactStore {
 		return record;
 	}
 
+	/**
+	 * Lists artifacts for a job, loading persisted metadata on first access.
+	 *
+	 * @param jobId job identifier
+	 * @return artifacts sorted by creation time
+	 * @throws IOException if metadata cannot be read
+	 */
 	synchronized List<ArtifactRecord> listArtifacts(String jobId) throws IOException {
 		loadIfNeeded(jobId);
 		List<ArtifactRecord> records = new ArrayList<>(artifactsByJob.getOrDefault(jobId, List.of()));
@@ -67,6 +99,14 @@ class ArtifactStore {
 		return records;
 	}
 
+	/**
+	 * Retrieves one artifact by ID.
+	 *
+	 * @param jobId job identifier that owns the artifact
+	 * @param artifactId artifact identifier
+	 * @return matching artifact record
+	 * @throws IOException if metadata cannot be read
+	 */
 	synchronized ArtifactRecord getArtifact(String jobId, String artifactId) throws IOException {
 		return listArtifacts(jobId).stream().filter(a -> artifactId.equals(a.artifactId)).findFirst()
 				.orElseThrow(() -> new ApiException(404, "ARTIFACT_NOT_FOUND",
@@ -74,6 +114,13 @@ class ArtifactStore {
 					Map.of("jobId", jobId, "artifactId", artifactId)));
 	}
 
+	/**
+	 * Writes a JSON summary artifact for a completed import/analyze job.
+	 *
+	 * @param jobId job identifier
+	 * @param result final job result to serialize
+	 * @throws IOException if the summary file or artifact metadata cannot be written
+	 */
 	synchronized void writeSummaryArtifact(String jobId, JobResult result) throws IOException {
 		Path summaryFile = ensureJobDir(jobId).resolve("artifacts").resolve("summary.json");
 		Files.writeString(summaryFile, JsonSupport.GSON.toJson(result), StandardCharsets.UTF_8,
@@ -81,6 +128,12 @@ class ArtifactStore {
 		registerArtifact(jobId, summaryFile, "report", "application/json", false);
 	}
 
+	/**
+	 * Builds the artifact shape used in event payloads, excluding local filesystem paths.
+	 *
+	 * @param record artifact metadata to expose
+	 * @return serializable public artifact view
+	 */
 	private Object publicView(ArtifactRecord record) {
 		Map<String, Object> view = new LinkedHashMap<>();
 		view.put("artifactId", record.artifactId);
@@ -94,6 +147,12 @@ class ArtifactStore {
 		return view;
 	}
 
+	/**
+	 * Loads artifact metadata for a job when it is not already cached.
+	 *
+	 * @param jobId job identifier
+	 * @throws IOException if metadata cannot be read
+	 */
 	private void loadIfNeeded(String jobId) throws IOException {
 		if (artifactsByJob.containsKey(jobId)) {
 			return;
@@ -109,6 +168,12 @@ class ArtifactStore {
 		artifactsByJob.put(jobId, records == null ? new ArrayList<>() : new ArrayList<>(records));
 	}
 
+	/**
+	 * Persists the cached artifact list for a job.
+	 *
+	 * @param jobId job identifier
+	 * @throws IOException if metadata cannot be written
+	 */
 	private void save(String jobId) throws IOException {
 		Path metadata = metadataFile(jobId);
 		Files.createDirectories(metadata.getParent());
@@ -117,6 +182,12 @@ class ArtifactStore {
 			StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
 	}
 
+	/**
+	 * Resolves the metadata file that stores artifact records for a job.
+	 *
+	 * @param jobId job identifier
+	 * @return artifact metadata file path
+	 */
 	private Path metadataFile(String jobId) {
 		return jobsRoot.resolve(jobId).resolve("artifacts.json");
 	}

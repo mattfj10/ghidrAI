@@ -28,6 +28,13 @@ class ApiEnvelope {
 	final Object data;
 	final ApiError error;
 
+	/**
+	 * Wraps all API responses in a consistent protocol envelope.
+	 *
+	 * @param requestId request correlation ID returned to the client
+	 * @param data successful response payload, or {@code null} for errors
+	 * @param error structured error payload, or {@code null} for successful responses
+	 */
 	ApiEnvelope(String requestId, Object data, ApiError error) {
 		this.requestId = requestId;
 		this.data = data;
@@ -40,6 +47,13 @@ class ApiError {
 	final String message;
 	final Object details;
 
+	/**
+	 * Creates a structured error payload for API responses.
+	 *
+	 * @param code stable machine-readable error code
+	 * @param message human-readable error message
+	 * @param details optional validation or context details
+	 */
 	ApiError(String code, String message, Object details) {
 		this.code = code;
 		this.message = message;
@@ -51,10 +65,25 @@ class ApiException extends RuntimeException {
 	final int statusCode;
 	final ApiError error;
 
+	/**
+	 * Creates an API exception with no additional details.
+	 *
+	 * @param statusCode HTTP status code to return
+	 * @param code stable machine-readable error code
+	 * @param message human-readable error message
+	 */
 	ApiException(int statusCode, String code, String message) {
 		this(statusCode, code, message, null);
 	}
 
+	/**
+	 * Creates an API exception that can be translated directly into an HTTP error response.
+	 *
+	 * @param statusCode HTTP status code to return
+	 * @param code stable machine-readable error code
+	 * @param message human-readable error message
+	 * @param details optional validation or context details
+	 */
 	ApiException(int statusCode, String code, String message, Object details) {
 		super(message);
 		this.statusCode = statusCode;
@@ -73,6 +102,17 @@ class ProjectRecord {
 	boolean existsOnDisk;
 	boolean isActive;
 
+	/**
+	 * Creates a new project record with server-managed timestamps and legacy path fields cleared.
+	 *
+	 * @param projectId stable server-assigned project ID
+	 * @param name display name shown in the UI
+	 * @param projectDirectory parent directory containing the Ghidra project
+	 * @param projectName Ghidra project name
+	 * @param existsOnDisk whether the project currently exists on disk
+	 * @param isActive whether the project should start as active
+	 * @return initialized project record
+	 */
 	static ProjectRecord create(String projectId, String name, String projectDirectory,
 			String projectName, boolean existsOnDisk, boolean isActive) {
 		ProjectRecord record = new ProjectRecord();
@@ -136,6 +176,14 @@ class JobProgress {
 	Integer total;
 	Integer percent;
 
+	/**
+	 * Creates a progress snapshot for a job event or job detail response.
+	 *
+	 * @param phase broad execution phase
+	 * @param current current item count within the phase
+	 * @param total total item count within the phase
+	 * @param percent optional overall completion percentage
+	 */
 	JobProgress(String phase, Integer current, Integer total, Integer percent) {
 		this.phase = phase;
 		this.current = current;
@@ -193,6 +241,13 @@ class ServerEvent {
 	final String eventType;
 	final JsonElement payload;
 
+	/**
+	 * Creates a server-sent event with an assigned sequence number.
+	 *
+	 * @param sequence monotonically increasing event sequence
+	 * @param eventType SSE event type
+	 * @param payload JSON payload delivered to clients
+	 */
 	ServerEvent(long sequence, String eventType, JsonElement payload) {
 		this.sequence = sequence;
 		this.eventType = eventType;
@@ -206,6 +261,14 @@ class ActiveDisassemblyResponse {
 	final String disassembly;
 	final List<DisassemblyLine> lines;
 
+	/**
+	 * Creates the response body for active-project disassembly requests.
+	 *
+	 * @param projectId active project identifier
+	 * @param binaryName requested binary/program name
+	 * @param disassembly formatted text disassembly
+	 * @param lines structured per-instruction disassembly data
+	 */
 	ActiveDisassemblyResponse(String projectId, String binaryName, String disassembly,
 			List<DisassemblyLine> lines) {
 		this.projectId = projectId;
@@ -219,6 +282,12 @@ class DisassemblyData {
 	final String disassembly;
 	final List<DisassemblyLine> lines;
 
+	/**
+	 * Holds the formatted and structured disassembly returned by Ghidra operations.
+	 *
+	 * @param disassembly formatted text disassembly
+	 * @param lines structured per-instruction line data
+	 */
 	DisassemblyData(String disassembly, List<DisassemblyLine> lines) {
 		this.disassembly = disassembly;
 		this.lines = lines;
@@ -231,6 +300,14 @@ class DisassemblyLine {
 	final String instruction;
 	final List<InlineComment> inlineComments;
 
+	/**
+	 * Creates one structured disassembly line.
+	 *
+	 * @param address instruction address
+	 * @param bytes formatted instruction bytes
+	 * @param instruction printable instruction text
+	 * @param inlineComments comments associated with the instruction line
+	 */
 	DisassemblyLine(String address, String bytes, String instruction, List<InlineComment> inlineComments) {
 		this.address = address;
 		this.bytes = bytes;
@@ -244,10 +321,24 @@ class InlineComment {
 	final String text;
 	final String sourceAddress;
 
+	/**
+	 * Creates an inline comment with no separate source address.
+	 *
+	 * @param kind comment category such as {@code EOL}, {@code AUTOMATIC}, or {@code OFFCUT}
+	 * @param text comment text
+	 */
 	InlineComment(String kind, String text) {
 		this(kind, text, null);
 	}
 
+	/**
+	 * Creates an inline comment extracted from Ghidra's end-of-line comment model.
+	 *
+	 * @param kind comment category such as {@code EOL}, {@code AUTOMATIC}, or
+	 *            {@code REFERENCED_REPEATABLE}
+	 * @param text comment text
+	 * @param sourceAddress optional source address for referenced comments
+	 */
 	InlineComment(String kind, String text, String sourceAddress) {
 		this.kind = kind;
 		this.text = text;

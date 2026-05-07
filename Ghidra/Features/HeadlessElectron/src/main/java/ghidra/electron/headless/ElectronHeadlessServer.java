@@ -33,11 +33,29 @@ public class ElectronHeadlessServer {
 	private final HeadlessJobManager jobManager;
 	private final ArtifactStore artifactStore;
 
+	/**
+	 * Creates the production HTTP server used by the Electron frontend.
+	 *
+	 * @param port local loopback port to bind, or {@code 0} to let the OS choose one
+	 * @param dataDir directory used for persisted project, job, and artifact metadata
+	 * @param repoRoot root of the Ghidra checkout containing the headless runtime scripts
+	 * @throws IOException if the server or backing stores cannot be created
+	 */
 	public ElectronHeadlessServer(int port, Path dataDir, Path repoRoot) throws IOException {
 		this(new EventBroker(), dataDir, port, new DefaultGhidraProjectOps(),
 			new ScriptProcessExecutionEngine(repoRoot));
 	}
 
+	/**
+	 * Creates a server with injectable collaborators for tests and alternate runtimes.
+	 *
+	 * @param eventBroker broker used for server-sent project, job, and artifact events
+	 * @param dataDir directory used for persisted backend state
+	 * @param port local loopback port to bind
+	 * @param projectOps implementation that performs Ghidra project operations
+	 * @param engine implementation that executes headless import/analyze jobs
+	 * @throws IOException if the HTTP server or stores cannot be initialized
+	 */
 	ElectronHeadlessServer(EventBroker eventBroker, Path dataDir, int port, GhidraProjectOps projectOps,
 			HeadlessExecutionEngine engine) throws IOException {
 		this.eventBroker = eventBroker;
@@ -55,6 +73,11 @@ public class ElectronHeadlessServer {
 		server.createContext("/api/v1/events", this::handleEvents);
 	}
 
+	/**
+	 * Initializes Ghidra and starts accepting HTTP requests.
+	 *
+	 * @throws IOException if Ghidra initialization fails or the HTTP server cannot start
+	 */
 	public void start() throws IOException {
 		// Initialize Ghidra before starting the HTTP server so the first create/open
 		// project request does not block for 30-60+ seconds. The launch script waits
@@ -72,26 +95,54 @@ public class ElectronHeadlessServer {
 		server.start();
 	}
 
+	/**
+	 * Returns the bound TCP port, including the assigned port when the server was created with
+	 * {@code port == 0}.
+	 *
+	 * @return the local port currently used by the HTTP server
+	 */
 	int getPort() {
 		return server.getAddress().getPort();
 	}
 
+	/**
+	 * Stops background job execution and closes the HTTP listener.
+	 */
 	public void stop() {
 		jobManager.shutdown();
 		server.stop(0);
 	}
 
+	/**
+	 * Handles the health endpoint used by launch scripts and the frontend to detect readiness.
+	 *
+	 * @param exchange active HTTP exchange for {@code /api/v1/health}
+	 * @throws IOException if the response cannot be written
+	 */
 	private void handleHealth(HttpExchange exchange) throws IOException {
 		String requestId = JsonSupport.requestId(exchange);
 		JsonSupport.writeEnvelope(exchange, 200, requestId,
 			Map.of("status", "ok", "protocolVersion", ApiEnvelope.PROTOCOL_VERSION));
 	}
 
+	/**
+	 * Returns static protocol capabilities so the frontend can adapt to supported operations.
+	 *
+	 * @param exchange active HTTP exchange for {@code /api/v1/capabilities}
+	 * @throws IOException if the response cannot be written
+	 */
 	private void handleCapabilities(HttpExchange exchange) throws IOException {
 		String requestId = JsonSupport.requestId(exchange);
 		JsonSupport.writeEnvelope(exchange, 200, requestId, new CapabilityResponse());
 	}
 
+	/**
+	 * Reads disassembly for a binary in the currently active project.
+	 *
+	 * @param exchange active HTTP exchange for
+	 *            {@code /api/v1/projects/active/disassembly?binaryName=...}
+	 * @throws IOException if request or response I/O fails
+	 */
 	private void handleActiveDisassembly(HttpExchange exchange) throws IOException {
 		if (!"GET".equals(exchange.getRequestMethod())) {
 			exchange.sendResponseHeaders(405, -1);
@@ -118,6 +169,13 @@ public class ElectronHeadlessServer {
 		}
 	}
 
+	/**
+	 * Routes project endpoints for listing, creating, opening, renaming, deleting, and importing
+	 * into projects.
+	 *
+	 * @param exchange active HTTP exchange under {@code /api/v1/projects}
+	 * @throws IOException if request parsing or response writing fails
+	 */
 	private void handleProjects(HttpExchange exchange) throws IOException {
 		String requestId = JsonSupport.requestId(exchange);
 		try {
@@ -228,6 +286,14 @@ public class ElectronHeadlessServer {
 		}
 	}
 
+	/**
+	 * Opens a project from an API request using exactly one selector style.
+	 *
+	 * @param request request containing either {@code projectId} or {@code projectPath} plus
+	 *            {@code projectName}
+	 * @return the active project record after validation
+	 * @throws IOException if the selected project cannot be opened
+	 */
 	private ProjectRecord openProject(OpenProjectRequest request) throws IOException {
 		boolean hasId = request.projectId != null && !request.projectId.isBlank();
 		boolean hasPath = request.projectPath != null && request.projectName != null &&
@@ -241,6 +307,12 @@ public class ElectronHeadlessServer {
 				: projectStore.openProjectByPathAndName(request.projectPath, request.projectName);
 	}
 
+	/**
+	 * Routes job endpoints for cancellation, artifact listing/download, and job detail lookup.
+	 *
+	 * @param exchange active HTTP exchange under {@code /api/v1/jobs}
+	 * @throws IOException if request parsing or response writing fails
+	 */
 	private void handleJobs(HttpExchange exchange) throws IOException {
 		String requestId = JsonSupport.requestId(exchange);
 		try {
@@ -287,6 +359,12 @@ public class ElectronHeadlessServer {
 		}
 	}
 
+	/**
+	 * Streams backend events to the frontend using server-sent events.
+	 *
+	 * @param exchange active HTTP exchange for {@code /api/v1/events}
+	 * @throws IOException if the stream cannot be opened or written
+	 */
 	private void handleEvents(HttpExchange exchange) throws IOException {
 		String requestId = JsonSupport.requestId(exchange);
 		try {
@@ -322,6 +400,12 @@ public class ElectronHeadlessServer {
 		}
 	}
 
+	/**
+	 * Parses the optional event replay cursor from a query string.
+	 *
+	 * @param rawQuery raw URI query string
+	 * @return requested event sequence cursor, or {@code 0} when no cursor is supplied
+	 */
 	private long parseSince(String rawQuery) {
 		if (rawQuery == null || rawQuery.isBlank()) {
 			return 0;
@@ -340,6 +424,13 @@ public class ElectronHeadlessServer {
 		return 0;
 	}
 
+	/**
+	 * Extracts and URL-decodes a single query parameter.
+	 *
+	 * @param rawQuery raw URI query string
+	 * @param key parameter name to read
+	 * @return decoded parameter value, or {@code null} when absent
+	 */
 	private String queryParam(String rawQuery, String key) {
 		if (rawQuery == null || rawQuery.isBlank()) {
 			return null;
@@ -353,17 +444,36 @@ public class ElectronHeadlessServer {
 		return null;
 	}
 
+	/**
+	 * Produces the public artifact view returned by list endpoints, excluding local filesystem
+	 * paths.
+	 *
+	 * @param records artifact records from the job manager
+	 * @return serializable artifact summaries
+	 */
 	private Object sanitize(List<ArtifactRecord> records) {
 		return records.stream().map(a -> Map.of("artifactId", a.artifactId, "jobId", a.jobId, "name",
 			a.name, "type", a.type, "contentType", a.contentType, "size", a.size, "createdAt",
 			a.createdAt, "downloadUrl", a.downloadUrl)).toList();
 	}
 
+	/**
+	 * Produces the compact job view returned immediately after submission.
+	 *
+	 * @param job newly created job record
+	 * @return serializable job summary
+	 */
 	private Object jobSummary(JobRecord job) {
 		return Map.of("jobId", job.jobId, "state", job.state, "mode", job.mode, "projectId",
 			job.projectId, "createdAt", job.createdAt);
 	}
 
+	/**
+	 * Produces the detailed job view returned by job lookup endpoints.
+	 *
+	 * @param job stored job record
+	 * @return serializable job detail including progress, result, error, and artifact IDs
+	 */
 	private Object jobDetail(JobRecord job) {
 		Map<String, Object> view = new LinkedHashMap<>();
 		view.put("jobId", job.jobId);
@@ -381,6 +491,12 @@ public class ElectronHeadlessServer {
 		return view;
 	}
 
+	/**
+	 * Resolves the default backend data directory from the environment or the user's home
+	 * directory.
+	 *
+	 * @return directory used for persisted server state
+	 */
 	private static Path defaultDataDir() {
 		String configured = System.getenv("GHIDRA_ELECTRON_DATA_DIR");
 		if (configured != null && !configured.isBlank()) {
@@ -389,6 +505,12 @@ public class ElectronHeadlessServer {
 		return Paths.get(System.getProperty("user.home"), ".ghidra-electron-headless");
 	}
 
+	/**
+	 * Locates the Ghidra repository root used to launch {@code analyzeHeadless}.
+	 *
+	 * @return configured or discovered repository root
+	 * @throws IllegalStateException if no repository root can be discovered
+	 */
 	private static Path findRepoRoot() {
 		String configured = System.getenv("GHIDRA_REPO");
 		if (configured != null && !configured.isBlank()) {
@@ -404,6 +526,12 @@ public class ElectronHeadlessServer {
 		throw new IllegalStateException("Unable to determine GHIDRA_REPO. Set GHIDRA_REPO explicitly.");
 	}
 
+	/**
+	 * Starts the backend directly from Java for local development and launcher scripts.
+	 *
+	 * @param args ignored; configuration is read from environment variables
+	 * @throws Exception if server construction or startup fails
+	 */
 	public static void main(String[] args) throws Exception {
 		int port = Integer.parseInt(System.getenv().getOrDefault("GHIDRA_ELECTRON_PORT", "8089"));
 		ElectronHeadlessServer server =

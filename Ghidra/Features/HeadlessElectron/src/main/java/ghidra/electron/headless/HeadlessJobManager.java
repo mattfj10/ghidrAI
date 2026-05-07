@@ -31,6 +31,14 @@ class HeadlessJobManager {
 	private final Map<String, Future<?>> futures = new ConcurrentHashMap<>();
 	private volatile String activeJobId;
 
+	/**
+	 * Creates a manager for serialized headless import/analyze jobs.
+	 *
+	 * @param dataDir backend data directory used by related stores
+	 * @param artifactStore store used to publish and persist job artifacts
+	 * @param eventBroker broker used to publish job lifecycle events
+	 * @param executionEngine engine that launches or simulates headless Ghidra work
+	 */
 	HeadlessJobManager(Path dataDir, ArtifactStore artifactStore, EventBroker eventBroker,
 			HeadlessExecutionEngine executionEngine) {
 		this.dataDir = dataDir;
@@ -39,10 +47,20 @@ class HeadlessJobManager {
 		this.executionEngine = executionEngine;
 	}
 
+	/**
+	 * Stops any queued or running job tasks.
+	 */
 	void shutdown() {
 		executor.shutdownNow();
 	}
 
+	/**
+	 * Validates and queues a new import/analyze job for a project.
+	 *
+	 * @param project project that should receive imported programs
+	 * @param request import/analyze options from the API
+	 * @return queued job record
+	 */
 	synchronized JobRecord submitImportAnalyze(ProjectRecord project, ImportAnalyzeRequest request) {
 		validateRequest(request);
 		if (activeJobId != null) {
@@ -66,6 +84,12 @@ class HeadlessJobManager {
 		return job;
 	}
 
+	/**
+	 * Looks up a job by ID.
+	 *
+	 * @param jobId job identifier returned by submission
+	 * @return matching job record
+	 */
 	JobRecord getJob(String jobId) {
 		JobRecord job = jobs.get(jobId);
 		if (job == null) {
@@ -75,6 +99,11 @@ class HeadlessJobManager {
 		return job;
 	}
 
+	/**
+	 * Requests cancellation of a non-terminal job.
+	 *
+	 * @param jobId job identifier to cancel
+	 */
 	synchronized void cancelJob(String jobId) {
 		JobRecord job = getJob(jobId);
 		if (isTerminal(job.state)) {
@@ -85,16 +114,37 @@ class HeadlessJobManager {
 		executionEngine.cancel(job);
 	}
 
+	/**
+	 * Lists artifacts registered for an existing job.
+	 *
+	 * @param jobId job identifier whose artifacts should be listed
+	 * @return registered artifacts for the job
+	 * @throws IOException if artifact metadata cannot be read
+	 */
 	List<ArtifactRecord> listArtifacts(String jobId) throws IOException {
 		getJob(jobId);
 		return artifactStore.listArtifacts(jobId);
 	}
 
+	/**
+	 * Looks up a single artifact for an existing job.
+	 *
+	 * @param jobId job identifier that owns the artifact
+	 * @param artifactId artifact identifier to load
+	 * @return matching artifact record
+	 * @throws IOException if artifact metadata cannot be read
+	 */
 	ArtifactRecord getArtifact(String jobId, String artifactId) throws IOException {
 		getJob(jobId);
 		return artifactStore.getArtifact(jobId, artifactId);
 	}
 
+	/**
+	 * Runs a queued job, updates state transitions, registers artifacts, and publishes events.
+	 *
+	 * @param project target project for the import/analyze operation
+	 * @param job mutable job record to update as work progresses
+	 */
 	private void runJob(ProjectRecord project, JobRecord job) {
 		try {
 			Path jobDir = artifactStore.ensureJobDir(job.jobId);
@@ -172,6 +222,11 @@ class HeadlessJobManager {
 		}
 	}
 
+	/**
+	 * Validates request fields before a job is accepted.
+	 *
+	 * @param request import/analyze request to validate
+	 */
 	private void validateRequest(ImportAnalyzeRequest request) {
 		Map<String, String> fieldErrors = new LinkedHashMap<>();
 		if (request == null) {
@@ -209,6 +264,12 @@ class HeadlessJobManager {
 		}
 	}
 
+	/**
+	 * Converts optional request fields into the normalized form stored on job records.
+	 *
+	 * @param request validated request from the API
+	 * @return normalized request copy
+	 */
 	private ImportAnalyzeRequest normalize(ImportAnalyzeRequest request) {
 		ImportAnalyzeRequest normalized = new ImportAnalyzeRequest();
 		if (request.inputPaths != null && !request.inputPaths.isEmpty()) {
@@ -233,10 +294,23 @@ class HeadlessJobManager {
 		return normalized;
 	}
 
+	/**
+	 * Checks whether a job state can no longer transition.
+	 *
+	 * @param state current job state
+	 * @return true when the job is completed, failed, or cancelled
+	 */
 	private boolean isTerminal(String state) {
 		return "completed".equals(state) || "failed".equals(state) || "cancelled".equals(state);
 	}
 
+	/**
+	 * Registers standard logs emitted by the headless execution engine when they exist.
+	 *
+	 * @param jobId job identifier that owns the artifacts
+	 * @param jobDir job working directory
+	 * @throws IOException if artifact metadata cannot be written
+	 */
 	private void registerDefaultArtifacts(String jobId, Path jobDir) throws IOException {
 		Path artifactsDir = jobDir.resolve("artifacts");
 		registerIfExists(jobId, artifactsDir.resolve("application.log"), "log", "text/plain");
@@ -244,6 +318,15 @@ class HeadlessJobManager {
 		registerIfExists(jobId, artifactsDir.resolve("process-output.log"), "log", "text/plain");
 	}
 
+	/**
+	 * Registers an artifact only when the expected output file was produced.
+	 *
+	 * @param jobId job identifier that owns the artifact
+	 * @param file expected artifact file
+	 * @param type API artifact category
+	 * @param contentType MIME type used when serving the file
+	 * @throws IOException if artifact metadata cannot be written
+	 */
 	private void registerIfExists(String jobId, Path file, String type, String contentType)
 			throws IOException {
 		if (Files.exists(file)) {
@@ -251,6 +334,12 @@ class HeadlessJobManager {
 		}
 	}
 
+	/**
+	 * Refreshes the job record with currently registered artifact IDs.
+	 *
+	 * @param jobId job identifier to update
+	 * @throws IOException if artifact metadata cannot be read
+	 */
 	private void registerArtifactIds(String jobId) throws IOException {
 		JobRecord job = getJob(jobId);
 		job.activeArtifactIds =

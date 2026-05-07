@@ -48,14 +48,49 @@ import ghidra.util.exception.VersionException;
 import ghidra.util.task.TaskMonitor;
 
 interface GhidraProjectOps {
+	/**
+	 * Initializes the Ghidra application runtime before any project operations are attempted.
+	 *
+	 * @throws IOException if Ghidra cannot be initialized
+	 */
 	void ensureGhidraInitialized() throws IOException;
 
+	/**
+	 * Creates a new Ghidra project.
+	 *
+	 * @param projectDirectory parent directory for the project
+	 * @param projectName Ghidra project name
+	 * @throws IOException if validation or project creation fails
+	 */
 	void createProject(String projectDirectory, String projectName) throws IOException;
 
+	/**
+	 * Verifies that an existing project can be opened by Ghidra.
+	 *
+	 * @param projectDirectory parent directory containing the project
+	 * @param projectName Ghidra project name
+	 * @throws IOException if the project cannot be opened
+	 */
 	void validateProjectOpen(String projectDirectory, String projectName) throws IOException;
 
+	/**
+	 * Checks whether a Ghidra project exists on disk.
+	 *
+	 * @param projectDirectory parent directory containing the project
+	 * @param projectName Ghidra project name
+	 * @return true when the project directory exists
+	 */
 	boolean projectExists(String projectDirectory, String projectName);
 
+	/**
+	 * Reads formatted and structured disassembly for a program in a project.
+	 *
+	 * @param projectDirectory parent directory containing the project
+	 * @param projectName Ghidra project name
+	 * @param programName program file name inside the project
+	 * @return formatted disassembly text plus structured line data
+	 * @throws IOException if the project or program cannot be read
+	 */
 	DisassemblyData readProgramDisassembly(String projectDirectory, String projectName,
 			String programName)
 			throws IOException;
@@ -64,14 +99,32 @@ interface GhidraProjectOps {
 class DefaultGhidraProjectOps implements GhidraProjectOps {
 	private static final Object INIT_LOCK = new Object();
 
+	/**
+	 * Creates the default Ghidra-backed project operations implementation.
+	 *
+	 * @throws IOException reserved for parity with initialization callers
+	 */
 	DefaultGhidraProjectOps() throws IOException {
 	}
 
+	/**
+	 * Ensures the Ghidra runtime has been initialized.
+	 *
+	 * @throws IOException if Ghidra initialization fails
+	 */
 	@Override
 	public void ensureGhidraInitialized() throws IOException {
 		ensureInitialized();
 	}
 
+	/**
+	 * Creates a new project through Ghidra's project manager after validating the parent
+	 * directory and collision state.
+	 *
+	 * @param projectDirectory parent directory for the new project
+	 * @param projectName Ghidra project name
+	 * @throws IOException if validation or project creation fails
+	 */
 	@Override
 	public void createProject(String projectDirectory, String projectName) throws IOException {
 		ensureInitialized();
@@ -93,6 +146,13 @@ class DefaultGhidraProjectOps implements GhidraProjectOps {
 		}
 	}
 
+	/**
+	 * Opens and immediately closes a project to verify that it is readable by this process.
+	 *
+	 * @param projectDirectory parent directory containing the project
+	 * @param projectName Ghidra project name
+	 * @throws IOException if the project cannot be opened
+	 */
 	@Override
 	public void validateProjectOpen(String projectDirectory, String projectName) throws IOException {
 		ensureInitialized();
@@ -105,11 +165,27 @@ class DefaultGhidraProjectOps implements GhidraProjectOps {
 		project.close();
 	}
 
+	/**
+	 * Checks for the project directory that Ghidra uses to represent a project.
+	 *
+	 * @param projectDirectory parent directory containing the project
+	 * @param projectName Ghidra project name
+	 * @return true when the project directory exists
+	 */
 	@Override
 	public boolean projectExists(String projectDirectory, String projectName) {
 		return new ProjectLocator(projectDirectory, projectName).getProjectDir().exists();
 	}
 
+	/**
+	 * Opens a project, locates a program by name, and returns its disassembly.
+	 *
+	 * @param projectDirectory parent directory containing the project
+	 * @param projectName Ghidra project name
+	 * @param programName program file name to read
+	 * @return formatted disassembly text and structured line data
+	 * @throws IOException if the project or program cannot be opened
+	 */
 	@Override
 	public DisassemblyData readProgramDisassembly(String projectDirectory, String projectName,
 			String programName)
@@ -162,6 +238,13 @@ class DefaultGhidraProjectOps implements GhidraProjectOps {
 		}
 	}
 
+	/**
+	 * Opens a Ghidra project and maps framework exceptions into API errors.
+	 *
+	 * @param locator Ghidra project locator
+	 * @return opened project that the caller must close
+	 * @throws IOException if the project cannot be opened
+	 */
 	private Project openProject(ProjectLocator locator) throws IOException {
 		ServiceProjectManager pm = new ServiceProjectManager();
 		try {
@@ -180,6 +263,13 @@ class DefaultGhidraProjectOps implements GhidraProjectOps {
 		}
 	}
 
+	/**
+	 * Finds a program file by name, preferring exact matches before case-insensitive matches.
+	 *
+	 * @param folder folder tree to search
+	 * @param programName requested program file name
+	 * @return matching domain file, or {@code null} when absent
+	 */
 	private DomainFile findProgramFile(DomainFolder folder, String programName) {
 		DomainFile exactMatch = findProgramFile(folder, programName, false);
 		if (exactMatch != null) {
@@ -188,6 +278,14 @@ class DefaultGhidraProjectOps implements GhidraProjectOps {
 		return findProgramFile(folder, programName, true);
 	}
 
+	/**
+	 * Recursively searches a folder tree for a program domain file.
+	 *
+	 * @param folder current folder to search
+	 * @param programName requested program file name
+	 * @param ignoreCase whether to compare names case-insensitively
+	 * @return matching domain file, or {@code null} when absent
+	 */
 	private DomainFile findProgramFile(DomainFolder folder, String programName, boolean ignoreCase) {
 		for (DomainFile file : folder.getFiles()) {
 			if (!ProgramContentHandler.PROGRAM_CONTENT_TYPE.equals(file.getContentType())) {
@@ -207,6 +305,13 @@ class DefaultGhidraProjectOps implements GhidraProjectOps {
 		return null;
 	}
 
+	/**
+	 * Converts all instructions in a program into the API's text and line-oriented disassembly
+	 * model.
+	 *
+	 * @param program opened Ghidra program
+	 * @return disassembly text and per-instruction structured data
+	 */
 	private DisassemblyData formatDisassembly(Program program) {
 		StringBuilder out = new StringBuilder();
 		List<DisassemblyLine> lines = new ArrayList<>();
@@ -239,6 +344,12 @@ class DefaultGhidraProjectOps implements GhidraProjectOps {
 		return new DisassemblyData(out.toString(), lines);
 	}
 
+	/**
+	 * Extracts the inline comments Ghidra would show at the end of an instruction line.
+	 *
+	 * @param instruction instruction whose comments should be collected
+	 * @return inline comments grouped by API comment kind
+	 */
 	private List<InlineComment> extractInlineComments(Instruction instruction) {
 		List<InlineComment> comments = new ArrayList<>();
 		EolComments eolComments = new EolComments(instruction, true, Integer.MAX_VALUE,
@@ -256,6 +367,14 @@ class DefaultGhidraProjectOps implements GhidraProjectOps {
 		return comments;
 	}
 
+	/**
+	 * Adds non-blank comment lines to a structured comment list.
+	 *
+	 * @param out destination comment list
+	 * @param kind API comment kind such as {@code EOL} or {@code AUTOMATIC}
+	 * @param lines raw comment lines from Ghidra
+	 * @param sourceAddress optional source address for referenced repeatable comments
+	 */
 	private void addCommentLines(List<InlineComment> out, String kind, List<String> lines,
 			String sourceAddress) {
 		for (String line : lines) {
@@ -266,6 +385,12 @@ class DefaultGhidraProjectOps implements GhidraProjectOps {
 		}
 	}
 
+	/**
+	 * Builds comment display options that include the extra inline comment categories used by the
+	 * code browser.
+	 *
+	 * @return configured end-of-line comment options
+	 */
 	private EolExtraCommentsOption createEolOptions() {
 		EolExtraCommentsOption options = new EolExtraCommentsOption();
 		options.setRepeatable(EolEnablement.ALWAYS);
@@ -275,6 +400,12 @@ class DefaultGhidraProjectOps implements GhidraProjectOps {
 		return options;
 	}
 
+	/**
+	 * Formats instruction bytes as uppercase hexadecimal pairs separated by spaces.
+	 *
+	 * @param bytes raw instruction bytes
+	 * @return printable byte string, or an empty string for no bytes
+	 */
 	private String toHex(byte[] bytes) {
 		if (bytes == null || bytes.length == 0) {
 			return "";
@@ -289,6 +420,11 @@ class DefaultGhidraProjectOps implements GhidraProjectOps {
 		return sb.toString();
 	}
 
+	/**
+	 * Initializes the Ghidra application runtime once for the JVM.
+	 *
+	 * @throws IOException if no usable Ghidra application layout can be created
+	 */
 	private static void ensureInitialized() throws IOException {
 		if (Application.isInitialized()) {
 			return;

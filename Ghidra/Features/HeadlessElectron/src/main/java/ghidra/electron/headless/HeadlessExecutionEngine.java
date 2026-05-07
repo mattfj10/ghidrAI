@@ -21,15 +21,45 @@ import java.nio.file.*;
 import java.util.*;
 
 interface HeadlessExecutionEngine {
+	/**
+	 * Executes an import/analyze job and reports progress through the supplied listener.
+	 *
+	 * @param project target project for imported programs
+	 * @param job mutable job record for cancellation state
+	 * @param jobDir working directory for logs and artifacts
+	 * @param request normalized import/analyze request
+	 * @param listener callback for progress and process logs
+	 * @return process outcome used to determine final job state
+	 * @throws Exception if the job cannot be launched or monitored
+	 */
 	ExecutionOutcome run(ProjectRecord project, JobRecord job, Path jobDir, ImportAnalyzeRequest request,
 			ExecutionListener listener) throws Exception;
 
+	/**
+	 * Requests cancellation of a running job.
+	 *
+	 * @param job job record whose cancellation flag should be set
+	 */
 	void cancel(JobRecord job);
 }
 
 interface ExecutionListener {
+	/**
+	 * Reports a user-visible job progress update.
+	 *
+	 * @param phase broad execution phase, such as {@code setup}, {@code import}, or
+	 *            {@code analysis}
+	 * @param message human-readable progress message
+	 * @param percent optional completion percentage
+	 */
 	void onProgress(String phase, String message, Integer percent);
 
+	/**
+	 * Reports one line of output from the execution engine.
+	 *
+	 * @param stream stream name such as {@code stdout}, {@code stderr}, or {@code system}
+	 * @param message output line to publish
+	 */
 	void onLog(String stream, String message);
 }
 
@@ -37,6 +67,12 @@ class ExecutionOutcome {
 	final int exitCode;
 	final boolean cancelled;
 
+	/**
+	 * Captures the final process status for a headless execution.
+	 *
+	 * @param exitCode process exit code
+	 * @param cancelled whether the exit was caused by a cancellation request
+	 */
 	ExecutionOutcome(int exitCode, boolean cancelled) {
 		this.exitCode = exitCode;
 		this.cancelled = cancelled;
@@ -47,10 +83,20 @@ class ScriptProcessExecutionEngine implements HeadlessExecutionEngine {
 	private final Path repoRoot;
 	private volatile Process currentProcess;
 
+	/**
+	 * Creates an execution engine that launches the repository's {@code analyzeHeadless} script.
+	 *
+	 * @param repoRoot root of the Ghidra checkout
+	 */
 	ScriptProcessExecutionEngine(Path repoRoot) {
 		this.repoRoot = repoRoot;
 	}
 
+	/**
+	 * Marks the job cancelled and destroys the active process when one is running.
+	 *
+	 * @param job job record to cancel
+	 */
 	@Override
 	public synchronized void cancel(JobRecord job) {
 		job.cancelRequested = true;
@@ -59,6 +105,17 @@ class ScriptProcessExecutionEngine implements HeadlessExecutionEngine {
 		}
 	}
 
+	/**
+	 * Launches {@code analyzeHeadless}, captures process output, and returns the final outcome.
+	 *
+	 * @param project target project for imported programs
+	 * @param job mutable job record used to observe cancellation
+	 * @param jobDir working directory where logs are written
+	 * @param request normalized import/analyze request
+	 * @param listener progress and log callback
+	 * @return final execution outcome
+	 * @throws Exception if the process cannot be launched or monitored
+	 */
 	@Override
 	public ExecutionOutcome run(ProjectRecord project, JobRecord job, Path jobDir,
 			ImportAnalyzeRequest request, ExecutionListener listener) throws Exception {
@@ -96,6 +153,15 @@ class ScriptProcessExecutionEngine implements HeadlessExecutionEngine {
 		return new ExecutionOutcome(exitCode, cancelled);
 	}
 
+	/**
+	 * Creates a reader thread that appends process output to the job log and forwards it as events.
+	 *
+	 * @param stream process stream to read
+	 * @param streamName logical stream name for emitted log events
+	 * @param processLog combined process log file
+	 * @param listener progress and log callback
+	 * @return unstarted reader thread
+	 */
 	private Thread streamThread(InputStream stream, String streamName, Path processLog,
 			ExecutionListener listener) {
 		return new Thread(() -> {
@@ -117,6 +183,15 @@ class ScriptProcessExecutionEngine implements HeadlessExecutionEngine {
 		}, "headless-" + streamName + "-reader");
 	}
 
+	/**
+	 * Builds the {@code analyzeHeadless} command line from project and request options.
+	 *
+	 * @param project target project
+	 * @param request normalized import/analyze request
+	 * @param appLog application log destination
+	 * @param scriptLog script log destination
+	 * @return command suitable for {@link ProcessBuilder}
+	 */
 	private List<String> buildCommand(ProjectRecord project, ImportAnalyzeRequest request, Path appLog,
 			Path scriptLog) {
 		String projectDir = project.projectDirectory;
@@ -166,6 +241,13 @@ class ScriptProcessExecutionEngine implements HeadlessExecutionEngine {
 		return command;
 	}
 
+	/**
+	 * Appends a semicolon-separated search path flag when paths are present.
+	 *
+	 * @param command mutable command list
+	 * @param flag headless option flag
+	 * @param paths paths to join for the flag value
+	 */
 	private void appendScriptPaths(List<String> command, String flag, List<String> paths) {
 		if (paths == null || paths.isEmpty()) {
 			return;
@@ -174,6 +256,13 @@ class ScriptProcessExecutionEngine implements HeadlessExecutionEngine {
 		command.add(String.join(";", paths));
 	}
 
+	/**
+	 * Appends pre/post script options and each script's arguments.
+	 *
+	 * @param command mutable command list
+	 * @param flag headless script option flag
+	 * @param scripts script specifications to append
+	 */
 	private void appendScripts(List<String> command, String flag, List<ScriptSpec> scripts) {
 		if (scripts == null) {
 			return;

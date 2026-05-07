@@ -29,6 +29,14 @@ class ProjectStore {
 	private final EventBroker eventBroker;
 	private final Map<String, ProjectRecord> projectsById = new LinkedHashMap<>();
 
+	/**
+	 * Creates a project index backed by {@code projects.json} in the server data directory.
+	 *
+	 * @param dataDir directory where project metadata is persisted
+	 * @param projectOps Ghidra project operations used to validate and create projects
+	 * @param eventBroker broker used to publish project lifecycle events
+	 * @throws IOException if the data directory or project index cannot be read
+	 */
 	ProjectStore(Path dataDir, GhidraProjectOps projectOps, EventBroker eventBroker)
 			throws IOException {
 		this.storeFile = dataDir.resolve("projects.json");
@@ -38,6 +46,11 @@ class ProjectStore {
 		load();
 	}
 
+	/**
+	 * Lists known projects after refreshing whether each one still exists on disk.
+	 *
+	 * @return projects sorted by most recently opened first
+	 */
 	synchronized List<ProjectRecord> listProjects() {
 		refreshExistsFlags();
 		List<ProjectRecord> projects = new ArrayList<>(projectsById.values());
@@ -46,10 +59,21 @@ class ProjectStore {
 		return projects;
 	}
 
+	/**
+	 * Forces Ghidra initialization through the configured project operations implementation.
+	 *
+	 * @throws IOException if Ghidra cannot be initialized
+	 */
 	void ensureGhidraInitialized() throws IOException {
 		projectOps.ensureGhidraInitialized();
 	}
 
+	/**
+	 * Looks up a project in the persisted index.
+	 *
+	 * @param projectId stable project identifier assigned by the server
+	 * @return matching project record with an updated existence flag
+	 */
 	synchronized ProjectRecord getProject(String projectId) {
 		ProjectRecord project = projectsById.get(projectId);
 		if (project == null) {
@@ -60,6 +84,11 @@ class ProjectStore {
 		return project;
 	}
 
+	/**
+	 * Returns the project currently marked active for UI operations.
+	 *
+	 * @return active project record
+	 */
 	synchronized ProjectRecord getActiveProject() {
 		refreshExistsFlags();
 		for (ProjectRecord project : projectsById.values()) {
@@ -71,6 +100,14 @@ class ProjectStore {
 			"No active project is currently open.");
 	}
 
+	/**
+	 * Creates a new Ghidra project and adds it to the server index.
+	 *
+	 * @param projectDirectory parent directory where the project should be created
+	 * @param projectName Ghidra project name
+	 * @return stored project record for the new project
+	 * @throws IOException if project creation or persistence fails
+	 */
 	synchronized ProjectRecord createProject(String projectDirectory, String projectName)
 			throws IOException {
 		projectOps.createProject(projectDirectory, projectName);
@@ -86,11 +123,26 @@ class ProjectStore {
 		return record;
 	}
 
+	/**
+	 * Opens an indexed project by ID and marks it as active.
+	 *
+	 * @param projectId stable project identifier assigned by the server
+	 * @return active project record
+	 * @throws IOException if the underlying project cannot be opened
+	 */
 	synchronized ProjectRecord openProjectById(String projectId) throws IOException {
 		ProjectRecord record = getProject(projectId);
 		return activateRecord(record);
 	}
 
+	/**
+	 * Opens a project by filesystem location, adding it to the index if needed.
+	 *
+	 * @param projectDirectory parent directory containing the Ghidra project
+	 * @param projectName Ghidra project name
+	 * @return active project record
+	 * @throws IOException if validation or persistence fails
+	 */
 	synchronized ProjectRecord openProjectByPathAndName(String projectDirectory, String projectName)
 			throws IOException {
 		String normalizedDirectory = normalizeProjectDirectory(projectDirectory);
@@ -115,6 +167,14 @@ class ProjectStore {
 		return activateRecord(record);
 	}
 
+	/**
+	 * Validates a stored project with Ghidra, clears any previous active project, and marks this
+	 * record active.
+	 *
+	 * @param record project record to activate
+	 * @return the activated record
+	 * @throws IOException if the project cannot be opened or the index cannot be saved
+	 */
 	private ProjectRecord activateRecord(ProjectRecord record) throws IOException {
 		projectOps.validateProjectOpen(projectDirectory(record), storedProjectName(record));
 		for (ProjectRecord candidate : projectsById.values()) {
@@ -129,16 +189,31 @@ class ProjectStore {
 		return record;
 	}
 
+	/**
+	 * Updates all indexed records with their current on-disk existence status.
+	 */
 	private void refreshExistsFlags() {
 		for (ProjectRecord record : projectsById.values()) {
 			record.existsOnDisk = projectExists(record);
 		}
 	}
 
+	/**
+	 * Checks whether an indexed project still exists on disk.
+	 *
+	 * @param record project record to inspect
+	 * @return true when the corresponding project directory exists
+	 */
 	private boolean projectExists(ProjectRecord record) {
 		return projectOps.projectExists(projectDirectory(record), storedProjectName(record));
 	}
 
+	/**
+	 * Resolves the parent directory of a project from current or legacy record fields.
+	 *
+	 * @param record project record to resolve
+	 * @return normalized absolute project parent directory
+	 */
 	private String projectDirectory(ProjectRecord record) {
 		if (record.projectDirectory != null && !record.projectDirectory.isBlank()) {
 			return normalizeProjectDirectory(record.projectDirectory);
@@ -148,6 +223,12 @@ class ProjectStore {
 		return normalizeProjectDirectory((parent == null ? projectPath : parent).toString());
 	}
 
+	/**
+	 * Resolves the Ghidra project name from current or legacy record fields.
+	 *
+	 * @param record project record to resolve
+	 * @return stored Ghidra project name
+	 */
 	private String storedProjectName(ProjectRecord record) {
 		if (record.projectName != null && !record.projectName.isBlank()) {
 			return record.projectName;
@@ -160,14 +241,34 @@ class ProjectStore {
 		return filename;
 	}
 
+	/**
+	 * Builds a human-readable absolute project path for API error details.
+	 *
+	 * @param projectDirectory parent project directory
+	 * @param projectName Ghidra project name
+	 * @return absolute project path
+	 */
 	private String logicalProjectPath(String projectDirectory, String projectName) {
 		return Paths.get(projectDirectory, projectName).toAbsolutePath().toString();
 	}
 
+	/**
+	 * Normalizes a project parent directory to an absolute path string.
+	 *
+	 * @param projectDirectory directory supplied by the client or stored record
+	 * @return absolute path string
+	 */
 	private String normalizeProjectDirectory(String projectDirectory) {
 		return Paths.get(projectDirectory).toAbsolutePath().toString();
 	}
 
+	/**
+	 * Converts legacy records that stored a {@code .gpr} or {@code .rep} path into the logical
+	 * project directory/name form used by this API.
+	 *
+	 * @param projectPath legacy project path value
+	 * @return path without the legacy project file suffix
+	 */
 	private String normalizeLegacyProjectPath(String projectPath) {
 		if (projectPath.endsWith(".rep") || projectPath.endsWith(".gpr")) {
 			return projectPath.substring(0, projectPath.length() - 4);
@@ -175,10 +276,20 @@ class ProjectStore {
 		return projectPath;
 	}
 
+	/**
+	 * Creates a new opaque project identifier.
+	 *
+	 * @return project ID suitable for API use
+	 */
 	private String nextProjectId() {
 		return "proj_" + UUID.randomUUID().toString().replace("-", "");
 	}
 
+	/**
+	 * Loads persisted project records from disk and migrates legacy entries in memory.
+	 *
+	 * @throws IOException if the project index exists but cannot be read
+	 */
 	private void load() throws IOException {
 		if (!Files.exists(storeFile)) {
 			return;
@@ -196,6 +307,11 @@ class ProjectStore {
 		}
 	}
 
+	/**
+	 * Updates a legacy project record so current code can use project directory and name fields.
+	 *
+	 * @param record persisted project record to migrate
+	 */
 	private void migrateLegacyRecord(ProjectRecord record) {
 		if ((record.projectDirectory == null || record.projectDirectory.isBlank()) &&
 			record.projectPath != null && !record.projectPath.isBlank()) {
@@ -214,11 +330,22 @@ class ProjectStore {
 		record.projectPath = null;
 	}
 
+	/**
+	 * Clears the remembered project index without deleting project files from disk.
+	 *
+	 * @throws IOException if the updated index cannot be persisted
+	 */
 	synchronized void clearAllProjects() throws IOException {
 		projectsById.clear();
 		save();
 	}
 
+	/**
+	 * Removes a project from the server index without deleting the Ghidra project from disk.
+	 *
+	 * @param projectId project identifier to remove
+	 * @throws IOException if the updated index cannot be persisted
+	 */
 	synchronized void deleteProject(String projectId) throws IOException {
 		ProjectRecord removed = projectsById.remove(projectId);
 		if (removed == null) {
@@ -228,6 +355,14 @@ class ProjectStore {
 		save();
 	}
 
+	/**
+	 * Renames the display name stored in the server index.
+	 *
+	 * @param projectId project identifier to rename
+	 * @param newName new display name
+	 * @return updated project record
+	 * @throws IOException if the updated index cannot be persisted
+	 */
 	synchronized ProjectRecord renameProject(String projectId, String newName) throws IOException {
 		if (newName == null || newName.isBlank()) {
 			throw new ApiException(422, "VALIDATION_ERROR",
@@ -239,12 +374,24 @@ class ProjectStore {
 		return record;
 	}
 
+	/**
+	 * Reads disassembly for a binary in the active project.
+	 *
+	 * @param binaryName name of the program file inside the active project
+	 * @return formatted disassembly and structured line data
+	 * @throws IOException if the active project or program cannot be read
+	 */
 	synchronized DisassemblyData readActiveProjectDisassembly(String binaryName) throws IOException {
 		ProjectRecord active = getActiveProject();
 		return projectOps.readProgramDisassembly(projectDirectory(active), storedProjectName(active),
 			binaryName);
 	}
 
+	/**
+	 * Persists the current project index to {@code projects.json}.
+	 *
+	 * @throws IOException if the index cannot be written
+	 */
 	private void save() throws IOException {
 		List<ProjectRecord> records = new ArrayList<>(projectsById.values());
 		String json = JsonSupport.GSON.toJson(records);

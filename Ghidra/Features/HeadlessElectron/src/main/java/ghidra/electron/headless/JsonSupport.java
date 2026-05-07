@@ -29,6 +29,14 @@ class JsonSupport {
 	private JsonSupport() {
 	}
 
+	/**
+	 * Reads and deserializes a JSON request body.
+	 *
+	 * @param exchange active HTTP exchange containing the request body
+	 * @param type model type to deserialize into
+	 * @return parsed request model, or {@code null} for an empty or JSON null body
+	 * @throws IOException if the request body cannot be read
+	 */
 	static <T> T readJson(HttpExchange exchange, Class<T> type) throws IOException {
 		try (InputStream in = exchange.getRequestBody();
 				InputStreamReader reader = new InputStreamReader(in, StandardCharsets.UTF_8)) {
@@ -36,6 +44,12 @@ class JsonSupport {
 		}
 	}
 
+	/**
+	 * Gets the caller-supplied request ID or creates one for response correlation.
+	 *
+	 * @param exchange active HTTP exchange
+	 * @return request ID from {@code X-Request-Id}, or a generated UUID
+	 */
 	static String requestId(HttpExchange exchange) {
 		String requestId = exchange.getRequestHeaders().getFirst("X-Request-Id");
 		if (requestId == null || requestId.isBlank()) {
@@ -44,16 +58,42 @@ class JsonSupport {
 		return requestId;
 	}
 
+	/**
+	 * Writes a successful API envelope.
+	 *
+	 * @param exchange active HTTP exchange
+	 * @param statusCode HTTP status code
+	 * @param requestId response correlation ID
+	 * @param data response data payload
+	 * @throws IOException if the response cannot be written
+	 */
 	static void writeEnvelope(HttpExchange exchange, int statusCode, String requestId, Object data)
 			throws IOException {
 		writeJson(exchange, statusCode, new ApiEnvelope(requestId, data, null));
 	}
 
+	/**
+	 * Writes an error API envelope.
+	 *
+	 * @param exchange active HTTP exchange
+	 * @param statusCode HTTP status code
+	 * @param requestId response correlation ID
+	 * @param error structured API error
+	 * @throws IOException if the response cannot be written
+	 */
 	static void writeError(HttpExchange exchange, int statusCode, String requestId, ApiError error)
 			throws IOException {
 		writeJson(exchange, statusCode, new ApiEnvelope(requestId, null, error));
 	}
 
+	/**
+	 * Serializes an object as JSON and writes it to the HTTP response.
+	 *
+	 * @param exchange active HTTP exchange
+	 * @param statusCode HTTP status code
+	 * @param payload payload to serialize
+	 * @throws IOException if the response cannot be written
+	 */
 	static void writeJson(HttpExchange exchange, int statusCode, Object payload) throws IOException {
 		byte[] bytes = GSON.toJson(payload).getBytes(StandardCharsets.UTF_8);
 		exchange.getResponseHeaders().set("Content-Type", "application/json");
@@ -63,6 +103,16 @@ class JsonSupport {
 		}
 	}
 
+	/**
+	 * Streams a file as an HTTP response with explicit content headers.
+	 *
+	 * @param exchange active HTTP exchange
+	 * @param file file to stream
+	 * @param contentType MIME type for the response
+	 * @param dispositionType content disposition type such as {@code inline} or {@code attachment}
+	 * @param fileName filename advertised to the client
+	 * @throws IOException if the file cannot be read or the response cannot be written
+	 */
 	static void writeFile(HttpExchange exchange, Path file, String contentType, String dispositionType,
 			String fileName) throws IOException {
 		exchange.getResponseHeaders().set("Content-Type", contentType);
